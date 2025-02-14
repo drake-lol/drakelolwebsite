@@ -46,6 +46,7 @@ const a = .1, d = 1.5, p = 25, defaultImage = 'assets/bgimg/full_blue_square_512
 img.crossOrigin = "Anonymous";
 img.src = defaultImage;
 let c, x, w, h, R, C, I = [], qW, qH;
+let animationFrameId; // Store the animation frame ID
 
 function O(r, c, q, f = false) {
     const v = f ? .3 : .2, m = f ? .6 : .8, s = m + Math.random() * 2 * v, S = w * s, H = h * s, B = c * (w / d), Y = r * (h / d), Q = (q % 2) * qW, o = ~~(q / 2) * qH, rS = (Math.random() - .5) * .5;
@@ -78,7 +79,7 @@ function n() {
             }
     I.sort((a, b) => a.f - b.f);
     G();
-    m();
+    m(); // Start the animation loop
 }
 
 function D() {
@@ -99,6 +100,11 @@ function D() {
 }
 
 function m() {
+    // Cancel any previous animation frame request
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+    }
+
     for (let i = I.length - 1; i >= 0; i--) {
         let o = I[i];
         o.r += o.rS;
@@ -127,7 +133,7 @@ function m() {
     }
     I.sort((a, b) => a.f - b.f);
     D();
-    requestAnimationFrame(m);
+    animationFrameId = requestAnimationFrame(m); // Store the ID
 }
 
 img.onload = n;
@@ -152,14 +158,14 @@ async function updateLastFm() {
             let imageUrl = track.image[track.image.length - 1]['#text'];
             if (!imageUrl || imageUrl.includes('2a96cbd8b46e442fc41c2b86b821562f')) imageUrl = defaultImage;
             if (img.src !== imageUrl) {
-              img.onload = n;
+              img.onload = n; // This will restart the animation
               img.src = imageUrl;
             }
         } else {
             lastFmButton.textContent = 'Last.fm';
             lastFmButton.href = '#';
             if (img.src !== defaultImage) {
-              img.onload = n;
+              img.onload = n;  // This will restart the animation
               img.src = defaultImage;
             }
         }
@@ -168,7 +174,7 @@ async function updateLastFm() {
         lastFmButton.textContent = 'Last.fm';
         lastFmButton.href = '#';
         if (img.src !== defaultImage) {
-          img.onload = n;
+          img.onload = n;  // This will restart the animation
           img.src = defaultImage;
         }
     }
@@ -177,7 +183,6 @@ async function updateLastFm() {
 updateLastFm();
 setInterval(updateLastFm, 10000);
 
-// Prevent context menu (right-click menu) on links
 document.querySelectorAll('.b').forEach(link => {
   link.addEventListener('contextmenu', event => {
     event.preventDefault();
