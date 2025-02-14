@@ -46,7 +46,8 @@ const a = .1, d = 1.5, p = 25, defaultImage = 'assets/bgimg/full_blue_square_512
 img.crossOrigin = "Anonymous";
 img.src = defaultImage;
 let c, x, w, h, R, C, I = [], qW, qH;
-let animationFrameId; // Store the animation frame ID
+let animationFrameId;
+let lastFmUsername = "";
 
 function O(r, c, q, f = false) {
     const v = f ? .3 : .2, m = f ? .6 : .8, s = m + Math.random() * 2 * v, S = w * s, H = h * s, B = c * (w / d), Y = r * (h / d), Q = (q % 2) * qW, o = ~~(q / 2) * qH, rS = (Math.random() - .5) * .5;
@@ -79,7 +80,7 @@ function n() {
             }
     I.sort((a, b) => a.f - b.f);
     G();
-    m(); // Start the animation loop
+    m();
 }
 
 function D() {
@@ -100,7 +101,6 @@ function D() {
 }
 
 function m() {
-    // Cancel any previous animation frame request
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
     }
@@ -133,7 +133,7 @@ function m() {
     }
     I.sort((a, b) => a.f - b.f);
     D();
-    animationFrameId = requestAnimationFrame(m); // Store the ID
+    animationFrameId = requestAnimationFrame(m);
 }
 
 img.onload = n;
@@ -150,22 +150,30 @@ async function updateLastFm() {
         const data = await response.json();
         const isNowPlaying = data.recenttracks?.track?.[0]?.['@attr']?.nowplaying === 'true';
 
+      if (data.recenttracks && data.recenttracks['@attr'] && data.recenttracks['@attr'].user) {
+        lastFmUsername = data.recenttracks['@attr'].user;
+      }
+
         if (isNowPlaying) {
             const track = data.recenttracks.track[0];
-            const { artist, name } = track;
+            const { artist, name, external_urls } = track;
             lastFmButton.textContent = `Listening to ${name} by ${artist['#text']}`;
-            lastFmButton.href = `https://www.last.fm/user/${data.recenttracks['@attr'].user}`;
+
+            // Use track URL if available, otherwise fallback to user profile
+            lastFmButton.href = track.url || `https://www.last.fm/user/${lastFmUsername}`;
+
+
             let imageUrl = track.image[track.image.length - 1]['#text'];
             if (!imageUrl || imageUrl.includes('2a96cbd8b46e442fc41c2b86b821562f')) imageUrl = defaultImage;
             if (img.src !== imageUrl) {
-              img.onload = n; // This will restart the animation
+              img.onload = n;
               img.src = imageUrl;
             }
         } else {
             lastFmButton.textContent = 'Last.fm';
-            lastFmButton.href = '#';
+            lastFmButton.href = lastFmUsername ? `https://www.last.fm/user/${lastFmUsername}` : '#';
             if (img.src !== defaultImage) {
-              img.onload = n;  // This will restart the animation
+              img.onload = n;
               img.src = defaultImage;
             }
         }
@@ -174,7 +182,7 @@ async function updateLastFm() {
         lastFmButton.textContent = 'Last.fm';
         lastFmButton.href = '#';
         if (img.src !== defaultImage) {
-          img.onload = n;  // This will restart the animation
+          img.onload = n;
           img.src = defaultImage;
         }
     }
