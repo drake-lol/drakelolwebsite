@@ -23,8 +23,11 @@
 <img src="assets/bgimg/full_blue_square_512.png" alt="Corner Image" class="corner-image">
 <script>
 let img = new Image(), d = 1.5, defaultImage = 'assets/bgimg/full_blue_square_512.png', state = "", c, x, w, h, R, C, I, qW, qH, frame, user;
-img.crossOrigin = "Anonymous"; img.src = defaultImage;
+img.crossOrigin = "Anonymous";
+img.src = defaultImage; // Set the initial image source
+
 const O = (r, c, q, f) => ({ x: c * (w / d) + (q % 2) * qW, y: r * (h / d) + ~~(q / 2) * qH, r: 360 * Math.random(), rS: (Math.random() - .5) * .25, s: (f?.6 : .8) + Math.random() * 2 * (f?.3 : .2), S: w * ((f?.6 : .8) + Math.random() * 2 * (f?.3 : .2)), H: h * ((f?.6 : .8) + Math.random() * 2 * (f?.3 : .2)), B: c * (w / d), Y: r * (h / d), q, f });
+
 const init = () => {
   if (!c) { c = document.getElementById("c"); x = c.getContext("2d"); const o = window.devicePixelRatio || 1; c.width = innerWidth * o; c.height = innerHeight * o; x.scale(o, o); }
   w = img.width, h = img.height, C = Math.ceil(c.width / 2 / (w / d)), R = Math.ceil(c.height / 2 / (h / d)), qW = C * (w / d), qH = R * (h / d), I = [];
@@ -33,6 +36,7 @@ const init = () => {
   getDominantColor();
   draw();
 };
+
 const draw = () => {
   cancelAnimationFrame(frame);
   I = I.filter(t => (t.r += t.rS, t.x = t.B + (t.q % 2) * qW, t.y = t.Y + ~~(t.q / 2) * qH, !(t.x + t.S < -2 * innerWidth || t.y + t.H < -2 * innerHeight || t.x > 3 * innerWidth || t.y > 3 * innerHeight)));
@@ -44,7 +48,9 @@ const draw = () => {
   x.restore();
   frame = requestAnimationFrame(draw);
 };
+
 const rgbToHex = (r, g, b) => "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+
 const getDominantColor = () => {
   const tempCanvas = document.createElement('canvas'), tempCtx = tempCanvas.getContext('2d');
   tempCanvas.width = img.width; tempCanvas.height = img.height;
@@ -59,6 +65,7 @@ const getDominantColor = () => {
   }
   if (dominantColor) document.querySelector('meta[name="theme-color"]').setAttribute('content', dominantColor);
 };
+
 const lastFmButton = document.getElementById('lastfm-button'), lastFmApiUrl = 'https://lastfm-red-surf-3b97.damp-unit-21f3.workers.dev/';
 const updateLastFm = async () => {
   try {
@@ -80,8 +87,13 @@ const updateLastFm = async () => {
     if (state !== "Error") { img.onload = init; img.src = defaultImage; state = "Error"; }
   }
 };
-updateLastFm(); setInterval(updateLastFm, 10000);
+
+// Initial setup: Load and initialize with the default image.
+img.onload = init;  // Call init when the default image loads
+updateLastFm();
+setInterval(updateLastFm, 10000);
 document.querySelectorAll('.b').forEach(el => el.addEventListener('contextmenu', e => e.preventDefault()));
+
 </script>
 </body>
 </html>
