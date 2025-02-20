@@ -1,9 +1,9 @@
 :root {
   --s: 75px;
   --b: 100px;
-  --br: 1;
-  --contrast: 1.2; /* Separate contrast */
-  --saturate: 1.5; /* Separate saturate */
+  --br: 0.7;
+  --contrast: 1.1; /* Separate contrast */
+  --saturate: 1.7; /* Separate saturate */
   --g: 100vh;
   font-size: var(--s);
 }
