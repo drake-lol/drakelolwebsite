@@ -75,7 +75,7 @@ const updateTextColor = () => {
     const elementsToUpdate = document.querySelectorAll('.b');
     const brightness = getBrightness(averageColor);
     // Use a fixed threshold (128) and adjust the factor based on brightness
-    const factor = brightness > 128 ? 0.3 : 5.0;  // Darken if bright, lighten if dark
+    const factor = brightness > 168 ? 0.3 : 5.0;  // Darken if bright, lighten if dark
     const newColor = adjustColor(dominantColor, factor);
 
 
