@@ -18,66 +18,75 @@ const draw = () => {
 };
 const lastFmButton = document.getElementById('lastfm-button');
 const lastFmApiUrl = 'https://lastfm-red-surf-3b97.damp-unit-21f3.workers.dev/';
+
 const calculateColors = () => {
     const tempCanvas = document.createElement("canvas"), tempCtx = tempCanvas.getContext("2d");
-    tempCanvas.width = img.width; tempCanvas.height = img.height; tempCtx.drawImage(img, 0, 0, img.width, img.height);
+    tempCanvas.width = img.width; tempCanvas.height = img.height;
+    tempCtx.drawImage(img, 0, 0, img.width, img.height);
     const imageData = tempCtx.getImageData(0, 0, img.width, img.height).data;
-    let totalR = 0, totalG = 0, totalB = 0, colorCounts = {}, dominantR = 0, dominantG = 0, dominantB = 0, totalWeight = 0;
+
+    // For average color (grayscale)
+    let totalGray = 0;
+
+    // For dominant color (keep original logic)
+    let colorCounts = {}, dominantR = 0, dominantG = 0, dominantB = 0, totalWeight = 0;
+
     for (let i = 0; i < imageData.length; i += 4) {
-        const r = imageData[i], g = imageData[i + 1], b = imageData[i + 2], hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-        totalR += r; totalG += g; totalB += b; colorCounts[hex] = (colorCounts[hex] || 0) + 1;
-        const weight = colorCounts[hex]; dominantR += r * weight; dominantG += g * weight; dominantB += b * weight; totalWeight += weight;
+        const r = imageData[i], g = imageData[i + 1], b = imageData[i + 2];
+
+        // Grayscale conversion for average color
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        totalGray += gray;
+
+        // Dominant color calculation (original logic)
+        const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        colorCounts[hex] = (colorCounts[hex] || 0) + 1;
+        const weight = colorCounts[hex];
+        dominantR += r * weight;
+        dominantG += g * weight;
+        dominantB += b * weight;
+        totalWeight += weight;
     }
+
     const pixelCount = img.width * img.height;
-    averageColor = `#${Math.round(totalR / pixelCount).toString(16).padStart(2, '0')}${Math.round(totalG / pixelCount).toString(16).padStart(2, '0')}${Math.round(totalB / pixelCount).toString(16).padStart(2, '0')}`;
+    // Grayscale average color
+    const avgGray = Math.round(totalGray / pixelCount);
+    averageColor = `#${avgGray.toString(16).padStart(2, '0').repeat(3)}`;
+
     dominantColor = `#${Math.round(dominantR / totalWeight).toString(16).padStart(2, '0')}${Math.round(dominantG / totalWeight).toString(16).padStart(2, '0')}${Math.round(dominantB / totalWeight).toString(16).padStart(2, '0')}`;
 };
+
 const updateThemeAndFavicon = () => document.querySelector('meta[name="theme-color"]').setAttribute("content", averageColor);
-const adjustColor = (hex, factor) => `#${Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(1, 3), 16) * factor))).toString(16).padStart(2, '0')}${Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(3, 5), 16) * factor))).toString(16).padStart(2, '0')}${Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(5, 7), 16) * factor))).toString(16).padStart(2, '0')}`;
+const adjustColor = (hex, factor) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+
+    const newR = Math.max(0, Math.min(255, Math.round(r * factor)));
+    const newG = Math.max(0, Math.min(255, Math.round(g * factor)));
+    const newB = Math.max(0, Math.min(255, Math.round(b * factor)));
+
+    return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+};
 const getBrightness = (hex) => (parseInt(hex.slice(1, 3), 16) * 299 + parseInt(hex.slice(3, 5), 16) * 587 + parseInt(hex.slice(5, 7), 16) * 114) / 1000;
 const hexToHSL = (hex) => { let r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255, max = Math.max(r, g, b), min = Math.min(r, g, b), h, s, l = (max + min) / 2; if (max === min) h = s = 0; else { let d = max - min; s = l > 0.5 ? d / (2 - max - min) : d / (max + min); switch (max) { case r: h = (g - b) / d + (g < b ? 6 : 0); break; case g: h = (b - r) / d + 2; break; case b: h = (r - g) / d + 4; break; } h /= 6; } return [h, s, l]; }; //helper functions
 
-// --- Improved HSL to Hex Conversion ---
-const HSLToHex = (h, s, l) => {
-    let a = s * Math.min(l, 1 - l);
-    let f = n => {
-        let k = (n + h / 30) % 12;
-        let color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        return Math.round(255 * color).toString(16).padStart(2, '0');
-    };
-    return `#${f(0)}${f(8)}${f(4)}`;
-};
-
 const updateTextColor = () => {
     const elementsToUpdate = document.querySelectorAll('.b');
-    const signatureImage = document.querySelector('.signature');
     const brightness = getBrightness(averageColor);
-    let newColor = brightness >= 153 ? adjustColor(dominantColor, 0.3) : adjustColor(dominantColor, 5);
+    // Use a fixed threshold (128) and adjust the factor based on brightness
+    const factor = brightness > 128 ? 0.3 : 7.0;  // Darken if bright, lighten if dark
+    const newColor = adjustColor(dominantColor, factor);
+
 
     elementsToUpdate.forEach(el => el.style.color = newColor);
-
-    // --- Corrected Signature Image Color Handling ---
-
-    // 1. Convert newColor (hex) to HSL.
-    const [h, s, l] = hexToHSL(newColor);
-
-    // 2. Create a NEW image with the desired color.  This is the key change.
-    const colorCanvas = document.createElement('canvas');
-    colorCanvas.width = signatureImage.width; // Match the original image size
-    colorCanvas.height = signatureImage.height;
-    const colorCtx = colorCanvas.getContext('2d');
-
-    // 3. Fill the canvas with the exact newColor.
-    colorCtx.fillStyle = newColor;
-    colorCtx.fillRect(0, 0, colorCanvas.width, colorCanvas.height);
-
-    // 4. Use compositing to combine the colored canvas with the signature.
-    colorCtx.globalCompositeOperation = 'destination-in'; // This is the magic!
-    colorCtx.drawImage(signatureImage, 0, 0, colorCanvas.width, colorCanvas.height);
-
-    // 5. Convert the canvas to a data URL and use it as the image source.
-    signatureImage.src = colorCanvas.toDataURL();
-    signatureImage.style.filter = ''; // Reset any previous filters!
+    const signatureSvgs = document.querySelectorAll('.signature');
+    signatureSvgs.forEach(svg => {
+        const filledElements = svg.querySelectorAll('path, circle, rect, polygon, ellipse, line');
+        filledElements.forEach(element => {
+            element.style.fill = newColor;
+        });
+    });
 };
 
 const updateFavicon = (coverArtUrl, isPlaying) => {
@@ -140,7 +149,7 @@ const updateLastFm = async () => {
                     updateThemeAndFavicon();
                     updateTextColor();
                     draw();
-                    updateFavicon(imageUrl,isPlaying);
+                    updateFavicon(imageUrl, isPlaying);
                 };
                 lastFmImage.src = imageUrl;
             } else {

@@ -3,16 +3,15 @@
   --b: 100px;
   --br: 1;
   --contrast: 1.2; /* Separate contrast */
-  --saturate: 1; /* Separate saturate */
+  --saturate: 1.5; /* Separate saturate */
   --g: 100vh;
   font-size: var(--s);
 }
 
 body {
   margin: 0;
-  /* Remove overflow: hidden from body */
   overflow-x: hidden; /* Prevent horizontal scroll on the body */
-  overflow-y: auto;   /* Allow vertical scroll on the body */
+  overflow-y: auto;    /* Allow vertical scroll on the body */
   font-family: Fustat, sans-serif;
   color: #ffffffc4;
   display: flex;
@@ -35,6 +34,7 @@ body {
   user-select: none;
   opacity: .8;
   pointer-events: none;
+  /* No changes needed here, already works for SVG */
 }
 
 .g {
@@ -43,7 +43,7 @@ body {
   left: 0;
   width: 100%;
   height: var(--g);
-  overflow: hidden; /* Keep this to hide the overflowing content */
+  overflow: hidden;
   z-index: 1;
 }
 
@@ -101,9 +101,8 @@ body {
   margin: calc(2 * var(--s) + 150px) 0 0 var(--s);
   z-index: 3;
   gap: 0;
-  /* Ensure .b-c doesn't exceed body width */
   max-width: 100%;
-  box-sizing: border-box; /* Include padding/border in width calculation */
+  box-sizing: border-box;
 }
 
 .b {
