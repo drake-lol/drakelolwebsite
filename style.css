@@ -1,8 +1,8 @@
 :root {
     --s: 75px;
     --b: 100px;
-    --br: .7;
-    --c: 1.4;
+    --br: 1;
+    --c: 1.3;
     --g: 100vh;
     font-size: var(--s);
   }
