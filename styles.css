@@ -376,7 +376,7 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
   z-index: 3; /* Same as signature */
   border-radius: 8px;
   user-select: none;
-  pointer-events: none;
+  pointer-events: auto; /* Allow clicks/taps */
 }
 
 /* Media Queries for the old menu elements */

@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastfmAlbumDiv = document.getElementById('lastfm-album');
     const fetchLastFmBtn = document.getElementById('fetch-lastfm-btn');
 
+    const cornerImage = document.querySelector('.corner-image');
     // Blur layer elements
     const blurLayer1 = document.getElementById('blur-layer-1');
     const canvasHost = document.getElementById('canvas-host'); // Innermost div, canvas parent
@@ -108,6 +109,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let defaultBackgroundColor = '#121212'; // Will be updated from default image
     let defaultColorsLoaded = false; // New flag
     let defaultColorPalette = []; // Will be updated from default image
+
+    // Corner image tap tracking for debug menu
+    let cornerImageTapCount = 0;
+    let lastCornerImageTapTime = 0;
+    const TAP_INTERVAL_THRESHOLD = 700; // Taps must be within 700ms of each other
+    const REQUIRED_TAPS_FOR_DEBUG = 7;
 
     let dynamicBlurLayers = []; // To store dynamically created blur layers
     const MAX_BLUR_PER_LAYER = 50; // Max blur (px) per individual layer
@@ -1276,5 +1283,27 @@ function loadDefaultColors() {
     // Initialize selectors for old menu elements after DOM is loaded
     initializeOldMenuSelectors();
     handleOldMenuLastFmUpdate(null); // Initial call to set default state for old menu
+
+    // Event listener for corner image taps
+    if (cornerImage && debugMenu) {
+        cornerImage.addEventListener('click', () => {
+            const currentTime = performance.now();
+
+            if ((currentTime - lastCornerImageTapTime) > TAP_INTERVAL_THRESHOLD) {
+                cornerImageTapCount = 1; // Reset and count this tap as the first
+            } else {
+                cornerImageTapCount++;
+            }
+            lastCornerImageTapTime = currentTime;
+
+            if (cornerImageTapCount >= REQUIRED_TAPS_FOR_DEBUG) {
+                debugMenu.classList.remove('menu-hidden');
+                debugMenu.style.top = DEFAULT_MENU_TOP; // Reset position
+                debugMenu.style.left = DEFAULT_MENU_LEFT;
+                debugMenu.classList.remove('collapsed'); // Ensure it's not collapsed
+                cornerImageTapCount = 0; // Reset tap count after opening
+            }
+        });
+    }
     applyPostProcessingFilters(); // Apply initial post-processing filter state
 }); // End of main DOMContentLoaded
