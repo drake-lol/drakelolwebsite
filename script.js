@@ -73,8 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentBlurIntensity = 200; // Default blur intensity changed to 200px
 
     // Post-processing state variables
-    let currentBrightness = 40; // %
-    let currentContrast = 70;   // %
+    let currentBrightness = 50; // %
+    let currentContrast = 100;   // %
     let currentSaturation = 400; // %
     let currentHueRotate = 0;    // deg
     
