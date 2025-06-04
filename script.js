@@ -332,8 +332,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const SHAPE_TYPES = ['roundedRectangle', 'circle', 'ellipse', 'organic']; 
 
     function calculateRenderDimensions() {
-        // Set rendering dimensions to full window size
-        return { width: window.innerWidth, height: window.innerHeight };
+        // Set rendering dimensions to a fixed 512x512
+        return { width: 512, height: 512 };
     }
     
     const initialRenderDims = calculateRenderDimensions();
