@@ -1,0 +1,431 @@
+:root {
+  --s: 75px; /* For old menu positioning and sizing */
+}
+
+body {
+    margin: 0;
+    overflow: hidden; 
+    background-color: #121212; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; 
+    font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    color: #EAEAEA;
+}
+#scene-container {
+    width: 100vw;
+    height: 100vh;
+    position: fixed; 
+    top: 0;
+    left: 0;
+    z-index: 0;
+    overflow: hidden;
+}
+.blur-layer { /* Style for the new blur wrapper divs */
+    width: 100%;
+    height: 100%;
+    position: absolute; /* Ensure they stack correctly and fill parent */
+    top: 0;
+    left: 0;
+}
+/* Scale the outermost blur layer to provide bleed area for the blur effect */
+#blur-layer-1 {
+    /* Styles for scaling will be applied by JS if blur is active */
+    /* Default to 100% if not actively scaled by JS */
+    width: 100%; height: 100%;
+    top: 0; left: 0;
+}
+canvas {
+    display: block; 
+}
+#debug-menu {
+    position: absolute;
+    /* Default position, will be restored by JS if needed */
+    top: 20px;
+    left: 20px;
+    /* Ensure debug menu is above blur layers if they use z-index, though not strictly necessary with current setup */
+    z-index: 10; 
+    background-color: rgba(40, 40, 40, 0.75); 
+    color: #EAEAEA; 
+    border: 1px solid rgba(100, 100, 100, 0.5); 
+    border-radius: 8px; 
+    font-size: 13px; 
+    z-index: 100; 
+    min-width: 280px; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    -webkit-backdrop-filter: blur(10px); 
+    backdrop-filter: blur(10px); 
+    max-height: 500px; 
+    display: flex; 
+    flex-direction: column; 
+}
+#debug-menu.menu-hidden {
+    opacity: 0;
+    transform: scale(0.95);
+    pointer-events: none; 
+}
+#debug-menu-title {
+    background-color: rgba(55, 55, 55, 0.85); 
+    padding: 10px 15px; 
+    font-size: 14px;
+    font-weight: 600; 
+    cursor: default; 
+    border-bottom: 1px solid rgba(100, 100, 100, 0.5); 
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none; 
+    border-top-left-radius: 7px; 
+    border-top-right-radius: 7px;
+    flex-shrink: 0; 
+}
+.title-text-drag-area { 
+    flex-grow: 1;
+    cursor: grab; 
+    padding-right: 10px; 
+}
+#debug-menu.dragging .title-text-drag-area {
+    cursor: grabbing;
+}
+.title-buttons-wrapper {
+    display: flex;
+    align-items: center;
+}
+.window-control-button {
+    font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', Arial, sans-serif;
+    font-size: 10px; 
+    font-weight: normal;
+    padding: 5px 7px; 
+    cursor: pointer;
+    color: #D0D0D0;
+    border-radius: 4px;
+    line-height: 1;
+    margin-left: 5px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px; 
+    min-height: 20px;
+}
+#debug-menu-collapse-btn .toggle-icon {
+    font-size: 10px; 
+    transition: transform 0.2s ease-in-out;
+    color: #C0C0C0;
+}
+#debug-menu.collapsed #debug-menu-collapse-btn .toggle-icon {
+    transform: rotate(-90deg);
+}
+#debug-menu-collapse-btn:hover, #pause-resume-btn:hover { 
+    background-color: rgba(200, 200, 200, 0.2); 
+    color: #ffffff;
+}
+#debug-menu-close-btn:hover {
+    background-color: rgba(255, 80, 80, 0.9); 
+    color: #ffffff;
+}
+.debug-menu-content {
+    padding: 15px; 
+    transition: opacity 0.3s ease, max-height 0.3s ease, padding 0.3s ease;
+    opacity: 1;
+    overflow-y: auto; 
+    flex-grow: 1; 
+}
+#debug-menu.collapsed .debug-menu-content {
+    max-height: 0; 
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden; 
+}
+.debug-menu-content div, .debug-menu-content .control-group {
+    margin-bottom: 10px; 
+}
+.debug-menu-content label {
+    margin-left: 8px; 
+    vertical-align: middle;
+    display: inline-block; 
+    margin-bottom: 3px;
+}
+ .debug-menu-content .slider-label, .debug-menu-content .color-label, .debug-menu-content .text-input-label {
+    display: block; 
+    margin-bottom: 4px;
+}
+.debug-menu-content input[type="checkbox"] {
+    vertical-align: middle;
+    width: 16px; 
+    height: 16px;
+    accent-color: #0078D4; 
+}
+.debug-menu-content input[type="range"] {
+    width: calc(100% - 50px); 
+    margin-right: 5px;
+    vertical-align: middle;
+    accent-color: #0078D4;
+}
+.debug-menu-content input[type="color"] {
+    vertical-align: middle;
+    width: 30px;
+    height: 20px;
+    border: 1px solid rgba(100, 100, 100, 0.5);
+    border-radius: 3px;
+    padding: 1px;
+    margin-right: 5px;
+}
+.debug-menu-content .slider-value {
+    display: inline-block;
+    width: 40px; 
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.subsection-title {
+    font-weight: 600;
+    margin-top: 15px; 
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(100, 100, 100, 0.3);
+}
+.debug-menu-content > .subsection-title:first-child {
+    margin-top: 0;
+}
+#lastfm-status-container { /* Remove default bottom margin for this specific container */
+    margin-bottom: 0;
+}
+#pause-resume-btn, #delete-all-shapes-btn { 
+    background-color: rgba(80, 100, 120, 0.8);
+    color: #EAEAEA;
+    border: 1px solid rgba(100,120,140,0.9);
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 5px; 
+}
+#fetch-lastfm-btn { /* Style for the new Last.fm fetch button */
+    background-color: rgba(70, 90, 110, 0.8); /* Slightly different color */
+    color: #EAEAEA;
+    border: 1px solid rgba(90,110,130,0.9);
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 0; /* Remove space above the button */
+}
+ #pause-resume-btn:hover { 
+    background-color: rgba(100, 120, 140, 0.9);
+}
+#delete-all-shapes-btn:hover { 
+    background-color: rgba(150, 70, 70, 0.9); 
+    border-color: rgba(255, 100, 100, 0.9); /* Light red border on hover */
+}
+#fetch-lastfm-btn:hover {
+    background-color: rgba(90, 110, 130, 0.9);
+}
+.color-input-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+.color-input-group label {
+    width: 80px; 
+    margin-left: 0;
+}
+/* Last.fm specific styling for cleaner text layout */
+.lastfm-text-details { /* New wrapper for text */
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Vertically center the text lines within this container */
+    height: 50px; /* Match album art height for precise alignment */
+}
+#lastfm-track {
+    font-weight: bold; 
+    line-height: 1.2;  /* Tighter line height */
+    margin-bottom: 2px;/* Small space between track and artist */
+}
+#lastfm-artist {
+    font-size: 0.9em;  /* Moved from inline style */
+    color: #B0B0B0;   /* Moved from inline style */
+    line-height: 1.2;  /* Tighter line height */
+    margin-bottom: 2px;/* Small space between artist and album */
+}
+#lastfm-album { /* Style for the album name */
+    font-size: 0.9em; /* Match artist font size */
+    color: #B0B0B0; /* Match artist color */
+    line-height: 1.2; /* Consistent line height */
+    margin-bottom: 2px;/* Small space between artist and album */
+}
+#lastfm-album-art { /* Ensure consistent styling if not already fully inline */
+    border-radius: 4px; /* Already inline, but good to have in CSS if other styles are added */
+    vertical-align: middle; /* Helps ensure consistent alignment of the image */
+}
+#lastfm-status-container {
+    margin-bottom: 0;
+    min-height: 50px; /* Set to album art height to maintain space */
+    display: flex;    /* Helps in centering content like loading/error messages */
+    align-items: center; /* Vertically center the active child (nowplaying, loading, etc.) */
+}
+#lastfm-loading, #lastfm-error, #lastfm-notplaying { /* #lastfm-nowplaying has its own style now */
+    width: 100%; /* Ensure the active content takes full width */
+}
+#lastfm-nowplaying { /* Moved from inline style */
+    display: flex;
+    align-items: center;
+    width: 100%; /* Ensure it takes full width within its container */
+}
+.lastfm-art-and-info { /* New wrapper for album art and its text details */
+    display: flex;
+    align-items: center; /* Vertically center the album art and the text details block */
+}
+
+/* --- START: Styles for copied old menu --- */
+.signature-container {
+  position: fixed;
+  top: var(--s);
+  left: var(--s);
+  z-index: 3; /* Ensure it's above the main scene but below debug menu if active */
+  font-family: Fustat, sans-serif; /* Apply Fustat font */
+}
+
+.signature {
+  height: var(--s);
+  width: auto;
+  user-select: none;
+  opacity: .8;
+  pointer-events: none;
+}
+
+/* .cls-1 is defined in the SVG, but JS will override fill */
+
+.b-c { /* Button container for old menu links */
+  position: fixed; /* Changed from default to fixed */
+  top: calc(2 * var(--s) + 150px); /* Position from top of viewport */
+  left: var(--s); /* Position from left of viewport */
+  right: 0; /* Extend to the right edge of the viewport */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  z-index: 3; /* Same as signature */
+  gap: 0;
+  /* max-width: 100%; /* Not strictly needed for fixed positioning unless content overflows */
+  max-height: calc(100vh - (2 * var(--s) + 150px)); /* Max height for desktop, extends to bottom from its top position */
+  overflow-y: auto; /* Allow vertical scrolling if content exceeds max-height */
+  box-sizing: border-box;
+  font-family: Fustat, sans-serif; /* Apply Fustat font */
+  /* Hide scrollbar for Firefox */
+  scrollbar-width: none;
+  /* Hide scrollbar for IE and Edge (older versions) */
+  -ms-overflow-style: none;
+}
+
+/* Hide scrollbar for WebKit browsers */
+.b-c::-webkit-scrollbar {
+  display: none;
+}
+
+.b { /* Individual links in the old menu */
+  opacity: .8;
+  transition: opacity .3s, transform .3s, font-weight .3s;
+  font-size: var(--s); /* Set font size based on --s variable */
+  cursor: pointer;
+  transform-origin: left;
+  text-align: left;
+  text-decoration: none;
+  color: inherit; /* Will inherit body color, then JS will set it */
+  max-width: 80vw;
+  box-sizing: border-box;
+  padding: 0 10px;
+  text-transform: lowercase;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: auto;
+  font-weight: 300; 
+  /* mix-blend-mode: multiply; /* Removed: problematic on dark bg, makes links too dark/invisible */
+  position: relative;
+}
+
+.b:not(#lastfm-button) {
+  line-height: 1.5;
+}
+
+a.b[href*="roblox.com"] { /* Make selector more specific */
+  line-height: 2;
+}
+
+.b:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  font-weight: 700;
+}
+
+#lastfm-button { /* Specific style for the Last.fm button in the old menu */
+  word-wrap: break-word;
+  white-space: normal;
+}
+
+.corner-image {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  z-index: 3; /* Same as signature */
+  border-radius: 8px;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Media Queries for the old menu elements */
+@media (max-width: 768px) {
+  :root {
+      --s: 50px; /* Adjust --s for smaller screens */
+      /* font-size: 40px; /* This was global, might conflict. Old menu elements set their own font sizes or inherit. */
+  }
+
+  .signature-container {
+      left: 50%;
+      transform: translateX(-50%);
+      top: var(--s);
+  }
+
+  .b-c {
+      flex-direction: column;
+      align-items: center;
+      top: 50%; /* Center vertically */
+      left: 50%;
+      transform: translate(-50%, -50%); /* Center horizontally and vertically */
+      max-height: 90vh; /* Max height for mobile, allowing some space around */
+      /* overflow-y: auto; will be inherited from desktop styles */
+      width: auto; /* Allow content to define width, or set a max-width */
+  }
+
+  .b {
+      transform-origin: center;
+      text-align: center;
+      flex-shrink: 0;
+      width: auto;
+      max-width: 90%;
+      padding: 0 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+      --s: 35px; /* Further adjust --s */
+  }
+
+  .b-c {
+      gap: 0;
+      /* top property will be inherited from the (max-width: 768px) rule for 50% */
+  }
+
+  .b {
+      max-width: 95%;
+      padding: 0 2px;
+  }
+}
+/* --- END: Styles for copied old menu --- */
