@@ -382,7 +382,7 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
 /* Media Queries for the old menu elements */
 @media (max-width: 768px) {
   :root {
-      --s: 50px; /* Adjust --s for smaller screens */
+      --s: 56.25px; /* 75% of desktop 75px */
       /* font-size: 40px; /* This was global, might conflict. Old menu elements set their own font sizes or inherit. */
   }
 
@@ -395,12 +395,13 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
   .b-c {
       flex-direction: column;
       align-items: center;
-      top: 50%; /* Center vertically */
       left: 50%;
-      transform: translate(-50%, -50%); /* Center horizontally and vertically */
-      max-height: 90vh; /* Max height for mobile, allowing some space around */
-      /* overflow-y: auto; will be inherited from desktop styles */
+      /* New positioning to be below signature and extend downwards */
+      top: calc(2 * var(--s) + 20px); /* Position below signature + 20px padding */
+      transform: translateX(-50%); /* Center horizontally only */
+      max-height: calc(100vh - (2 * var(--s) + 20px)); /* Extend to bottom from new top */
       width: auto; /* Allow content to define width, or set a max-width */
+      /* overflow-y: auto; is inherited and will allow scrolling */
   }
 
   .b {
@@ -415,12 +416,11 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
 
 @media (max-width: 480px) {
   :root {
-      --s: 35px; /* Further adjust --s */
+      --s: 56.25px; /* 75% of desktop 75px */
   }
 
   .b-c {
       gap: 0;
-      /* top property will be inherited from the (max-width: 768px) rule for 50% */
   }
 
   .b {

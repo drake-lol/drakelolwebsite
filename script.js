@@ -327,14 +327,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const BASE_MIN_ROTATION_SPEED = 0.002; 
     const BASE_MAX_ROTATION_SPEED = 0.01;
-    const BASE_MIN_SPEED = 0.5; 
-    const BASE_MAX_SPEED = 2.5;
+    const BASE_MIN_SPEED = 0.25; // Halved again
+    const BASE_MAX_SPEED = 1.25; // Halved again
     const SHAPE_TYPES = ['roundedRectangle', 'circle', 'ellipse', 'organic']; 
+
+    function calculateRenderDimensions() {
+        // Set rendering dimensions to full window size
+        return { width: window.innerWidth, height: window.innerHeight };
+    }
     
+    const initialRenderDims = calculateRenderDimensions();
     const params = {
         type: Two.Types.webgl, 
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: initialRenderDims.width,
+        height: initialRenderDims.height,
         autostart: true 
     };
     const two = new Two(params).appendTo(canvasHost); // Append to the new innermost host
@@ -342,6 +348,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (two.renderer && two.renderer.domElement) {
         twoJsCanvas = two.renderer.domElement;
+        // Style the canvas to stretch to fill its parent (canvasHost)
+        twoJsCanvas.style.width = '100%';
+        twoJsCanvas.style.height = '100%';
         // twoJsCanvas.style.backgroundColor will be handled by applyBlurEffect
     } else {
         console.error("Two.js canvas element not found after initialization.");
@@ -362,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. Reset styles for blurLayer1 (outermost scaler) and canvasHost (innermost, bg + final blur)
         blurLayer1.style.filter = 'none';
         blurLayer1.style.backgroundColor = 'transparent';
+        blurLayer1.style.position = 'absolute'; // Ensure it's positioned for top/left/width/height
         blurLayer1.style.width = '100%';
         blurLayer1.style.height = '100%';
         blurLayer1.style.top = '0';
@@ -375,8 +385,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         canvasHost.style.filter = 'none';
         canvasHost.style.backgroundColor = 'transparent'; // Will be set based on blur state
+        canvasHost.style.position = 'absolute'; // Ensure it's positioned to fill its parent
+        canvasHost.style.width = '100%'; // Ensure canvasHost fills its parent
+        canvasHost.style.height = '100%'; // Ensure canvasHost fills its parent
+        canvasHost.style.top = '0';
+        canvasHost.style.left = '0';
         canvasHost.style.willChange = 'auto';
-        // canvasHost dimensions are implicitly 100% of its parent.
 
         // twoJsCanvas (the actual Two.js drawing surface) is always transparent
         twoJsCanvas.style.backgroundColor = 'transparent';
@@ -592,7 +606,8 @@ document.addEventListener('DOMContentLoaded', () => {
         shapeData.needsReinitialization = false; // Reset reinitialization state
         const shapeType = SHAPE_TYPES[getRandomInt(0, SHAPE_TYPES.length - 1)];
         const minScreenDim = Math.min(two.width, two.height) || 600; // Fallback if dimensions are 0, e.g. initial load
-        const baseSize = getRandomFloat(minScreenDim * 0.50, minScreenDim * 1.10) * currentScaleMultiplier; // Doubled default size range
+        // Halved factors to halve proportional scale on 512px canvas (original factors were 0.50, 1.10)
+        const baseSize = getRandomFloat(minScreenDim * 0.25, minScreenDim * 0.55) * currentScaleMultiplier; 
         
         // Use existing paletteIndex if available, otherwise assign a new one.
         // This is crucial for replacement logic to pick up the correct new color.
@@ -669,10 +684,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const shapeType = SHAPE_TYPES[getRandomInt(0, SHAPE_TYPES.length - 1)];
         const minScreenDim = Math.min(two.width, two.height) || 600;
-        // Make transition shapes 1.5x bigger than normal shapes on average.
-        // Normal shapes: minScreenDim * 0.50 to minScreenDim * 1.10
-        // Transition shapes: (minScreenDim * 0.50 * 1.5) to (minScreenDim * 1.10 * 1.5)
-        const baseSize = getRandomFloat(minScreenDim * 0.75, minScreenDim * 1.65) * currentScaleMultiplier;
+        // Halved factors for transition shapes as well (original factors were 0.75, 1.65)
+        const baseSize = getRandomFloat(minScreenDim * 0.375, minScreenDim * 0.825) * currentScaleMultiplier;
 
         // Transition shapes use the current global colorPalette
         shapeData.paletteIndex = colorPalette.length > 0 ? getRandomInt(0, colorPalette.length - 1) : 0;
@@ -907,7 +920,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('resize', () => {
-        two.width = window.innerWidth; two.height = window.innerHeight;
+        const newRenderDims = calculateRenderDimensions();
+        two.width = newRenderDims.width;
+        two.height = newRenderDims.height;
+
         if (twoJsCanvas) {
             applyBlurEffect(currentAnimatedBackgroundColor); 
         }
