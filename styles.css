@@ -382,7 +382,7 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
 /* Media Queries for the old menu elements */
 @media (max-width: 768px) {
   :root {
-      --s: 56.25px; /* 75% of desktop 75px */
+      --s: 37.5px; /* 50% of desktop 75px */
       /* font-size: 40px; /* This was global, might conflict. Old menu elements set their own font sizes or inherit. */
   }
 
@@ -395,12 +395,13 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
   .b-c {
       flex-direction: column;
       align-items: center;
-      left: 50%;
+      left: 0; /* Align to the left edge */
       /* New positioning to be below signature and extend downwards */
       top: calc(2 * var(--s) + 20px); /* Position below signature + 20px padding */
-      transform: translateX(-50%); /* Center horizontally only */
-      max-height: calc(100vh - (2 * var(--s) + 20px)); /* Extend to bottom from new top */
-      width: auto; /* Allow content to define width, or set a max-width */
+      transform: none; /* Remove horizontal centering transform for the container */
+      bottom: 0; /* Extend to viewport bottom, defining the height with top */
+      justify-content: center; /* Vertically center buttons within this defined space */
+      width: 100%; /* Make the container span full viewport width */
       /* overflow-y: auto; is inherited and will allow scrolling */
   }
 
@@ -416,7 +417,7 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
 
 @media (max-width: 480px) {
   :root {
-      --s: 56.25px; /* 75% of desktop 75px */
+      --s: 37.5px; /* 50% of desktop 75px */
   }
 
   .b-c {
