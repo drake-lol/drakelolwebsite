@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Post-processing state variables
     let currentBrightness = 40; // %
     let currentContrast = 70;   // %
-    let currentSaturation = 200; // %
+    let currentSaturation = 400; // %
     let currentHueRotate = 0;    // deg
     
     const NUM_PALETTE_COLORS = 6;
