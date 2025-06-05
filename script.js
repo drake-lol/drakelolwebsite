@@ -73,9 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentBlurIntensity = 200; // Default blur intensity scaled for 64x64 canvas (was 200px for 512x512)
 
     // Post-processing state variables
-    let currentBrightness = 50; // %
-    let currentContrast = 100;   // %
-    let currentSaturation = 400; // %
+    let currentBrightness = 80; // %
+    let currentContrast = 120;   // %
+    let currentSaturation = 200; // %
     let currentHueRotate = 0;    // deg
     
     const NUM_PALETTE_COLORS = 6;
@@ -110,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let defaultColorsLoaded = false; // New flag
     let defaultColorPalette = []; // Will be updated from default image
 
+    let isInitialShapeSpawn = true; // Flag for initial center spawning
     // Variables for delayed old color cleanup
     let previousColorPaletteForCleanup = []; // Stores the palette before the most recent change
     let paletteChangeTimestampForCleanup = 0; // Timestamp of the last palette change
@@ -708,11 +709,31 @@ document.addEventListener('DOMContentLoaded', () => {
         shapeData.twoShape = newTwoShape; // shapeData.paletteIndex is already set
         shapeData.rotationSpeed = getRandomFloat(BASE_MIN_ROTATION_SPEED, BASE_MAX_ROTATION_SPEED) * currentRotationSpeedMultiplier * (Math.random() > 0.5 ? 1 : -1);
         shapeData.approxWidth = approxWidth; shapeData.approxHeight = approxHeight; // Store dimensions
+        
         const speed = getRandomFloat(BASE_MIN_SPEED, BASE_MAX_SPEED) * currentMovementSpeedMultiplier;
-        const offScreenOffset = Math.max(approxWidth, approxHeight) * 0.7; 
-        const spawnConfig = spawnConfigurations[getRandomInt(0, spawnConfigurations.length - 1)];
-        newTwoShape.translation.set(spawnConfig.getX(two.width, two.height, offScreenOffset), spawnConfig.getY(two.width, two.height, offScreenOffset));
-        shapeData.vx = spawnConfig.getVX(speed); shapeData.vy = spawnConfig.getVY(speed);
+
+        if (isInitialShapeSpawn) {
+            // Spawn in the center for the very first load
+            const centerX = two.width / 2;
+            const centerY = two.height / 2;
+            // Spawn within a small radius around the center
+            const spawnRadius = Math.min(two.width, two.height) * 0.2; // Adjust radius as needed
+            const randomAngle = Math.random() * Math.PI * 2;
+            const randomDist = Math.random() * spawnRadius;
+
+            newTwoShape.translation.set(
+                centerX + Math.cos(randomAngle) * randomDist,
+                centerY + Math.sin(randomAngle) * randomDist
+            );
+            const velocityAngle = Math.random() * Math.PI * 2; // Random direction
+            shapeData.vx = Math.cos(velocityAngle) * speed;
+            shapeData.vy = Math.sin(velocityAngle) * speed;
+        } else {
+            const offScreenOffset = Math.max(approxWidth, approxHeight) * 0.7; 
+            const spawnConfig = spawnConfigurations[getRandomInt(0, spawnConfigurations.length - 1)];
+            newTwoShape.translation.set(spawnConfig.getX(two.width, two.height, offScreenOffset), spawnConfig.getY(two.width, two.height, offScreenOffset));
+            shapeData.vx = spawnConfig.getVX(speed); shapeData.vy = spawnConfig.getVY(speed);
+        }
         if (!newTwoShape.parent) two.add(newTwoShape);
     }
     
@@ -1234,6 +1255,7 @@ function performInitialSceneSetupIfNeeded() {
         initializeColorPaletteUI(false); // Use derived palette for UI
         adjustShapesArray(); // Spawn shapes
         initialSceneSetupPerformed = true; // Mark that initial setup is done
+        isInitialShapeSpawn = false; // After first setup, subsequent spawns are not initial
     }
 
 }
