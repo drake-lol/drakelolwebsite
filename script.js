@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let menuInitialX, menuInitialY; 
 
     const DEFAULT_MENU_TOP = '20px'; 
+    // const DEFAULT_MENU_LEFT = '20px'; // Defined later, ensure no conflict
     const DEFAULT_MENU_LEFT = '20px'; 
 
     let currentNumShapes = 60; 
@@ -127,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_BLUR_PER_LAYER = 50; // Max blur (px) per layer, scaled for 64x64 (was 50px for 512x512)
 
     // --- START: Old Menu Integration ---
-    const OLD_MENU_FAVICON_BASE_SRC = '/assets/favicon/full_blue_trans_square_128.png';
+    const OLD_MENU_FAVICON_BASE_SRC = '/assets/favicon/newsquare7_128trans.png';
 
     let oldMenuLastFmButton = null;
     let oldMenuSignatureSVGs = null;
@@ -366,6 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const two = new Two(params).appendTo(canvasHost); // Append to the new innermost host
     let isPaused = false;
+    let pausedByVisibility = false; // To track if pause was due to page visibility
     
     if (two.renderer && two.renderer.domElement) {
         twoJsCanvas = two.renderer.domElement;
@@ -546,8 +548,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     pauseResumeBtn.addEventListener('click', () => {
         isPaused = !isPaused;
-        if (isPaused) { two.pause(); pauseResumeBtn.textContent = 'Resume Animation';} 
-        else { two.play(); pauseResumeBtn.textContent = 'Pause Animation'; }
+        pausedByVisibility = false; // User action overrides visibility pause
+        if (isPaused) {
+            two.pause();
+            pauseResumeBtn.textContent = 'Resume Animation';
+        } else {
+            two.play();
+            pauseResumeBtn.textContent = 'Pause Animation';
+            // If resuming, ensure the animation loop's lastTime is reset to avoid a large jump
+            lastTime = performance.now();
+        }
     });
     deleteAllShapesBtn.addEventListener('click', () => {
         while (shapesData.length > 0) {
@@ -1453,4 +1463,35 @@ function loadDefaultColors() {
         });
     }
     applyPostProcessingFilters(); // Apply initial post-processing filter state
+
+    // --- Page Visibility API ---
+    function handleVisibilityChange() {
+        if (document.hidden) {
+            // Page is hidden
+            if (!isPaused) { // Only pause if not already paused by user
+                two.pause();
+                isPaused = true;
+                pausedByVisibility = true;
+                if (pauseResumeBtn) pauseResumeBtn.textContent = 'Resume Animation';
+                console.log("Page hidden, animation paused.");
+            }
+            if (lastfmPollIntervalId) {
+                clearInterval(lastfmPollIntervalId);
+                lastfmPollIntervalId = null;
+                console.log("Page hidden, Last.fm polling stopped.");
+            }
+        } else {
+            // Page is visible
+            if (isPaused && pausedByVisibility) { // Only resume if paused by visibility
+                two.play();
+                isPaused = false;
+                pausedByVisibility = false;
+                if (pauseResumeBtn) pauseResumeBtn.textContent = 'Pause Animation';
+                lastTime = performance.now(); // Reset lastTime to prevent jump
+                console.log("Page visible, animation resumed.");
+            }
+            fetchLastFmData(true); // Fetch Last.fm data immediately and restart interval
+        }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange, false);
 }); // End of main DOMContentLoaded
