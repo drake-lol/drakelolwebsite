@@ -79,7 +79,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSaturation = 200; // %
     let currentHueRotate = 0;    // deg
     
-    const NUM_PALETTE_COLORS = 6;
+    // Maximum number of colors to request from ColorThief for the palette.
+    const MAX_PALETTE_COLORS_TO_REQUEST = 8; // You can adjust this value
+    const COLOR_SIMILARITY_TOLERANCE = 45; // Adjust this value (0-442).
+                                           // Lower values mean colors must be more different.
+                                           // Higher values mean more colors will be grouped as similar.
+                                           // e.g., 30-60 is a reasonable range to start experimenting.
+    const LUMINANCE_THRESHOLD = 0.55;      // Threshold for determining if a background is "light".
+                                           // (0=black, 1=white). Colors above this will get the overlay.
+                                           // Adjust between 0.4 (dims more colors) and 0.7 (dims only very bright colors).
+
     let colorPalette = []; 
 
     // Background Color Transition Variables
@@ -116,8 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let previousColorPaletteForCleanup = []; // Stores the palette before the most recent change
     let paletteChangeTimestampForCleanup = 0; // Timestamp of the last palette change
     let cleanupTriggeredForCurrentPaletteChange = true; // True if cleanup for the current old_palette has been initiated (or not needed)
-    const CLEANUP_START_DELAY = 5000; // 5 seconds delay before starting to scale down old shapes
-    const CLEANUP_SCALE_DURATION = 10000; // 10 seconds duration for shapes to scale down
+    const CLEANUP_START_DELAY = 0; // Start cleanup immediately after palette change
     // Corner image tap tracking for debug menu
     let cornerImageTapCount = 0;
     let lastCornerImageTapTime = 0;
@@ -242,44 +250,102 @@ document.addEventListener('DOMContentLoaded', () => {
         return rgbToHex(Math.floor(Math.random() * 256), Math.floor(Math.random() * 256), Math.floor(Math.random() * 256));
     }
 
+    /**
+     * Calculates the relative luminance of a hex color.
+     * @param {string} hex - The hex color string (e.g., "#RRGGBB").
+     * @returns {number} Luminance value between 0 (darkest) and 1 (lightest).
+     */
+    function getLuminance(hex) {
+        const rgb = hexToRgb(hex); // Assumes hexToRgb returns {r, g, b} in 0-255
+        if (!rgb) return 0; // Fallback for invalid hex
+
+        // Normalize RGB values to 0-1
+        let r = rgb.r / 255, g = rgb.g / 255, b = rgb.b / 255;
+
+        // Convert sRGB to linear RGB
+        r = (r <= 0.04045) ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+        g = (g <= 0.04045) ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+        b = (b <= 0.04045) ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+
+        // Calculate luminance using the Rec. 709 formula
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    /**
+     * Adds or removes a class from the scene container based on background luminance
+     * and/or palette color luminances to toggle a dimming overlay.
+     * @param {string} backgroundColorHex - The current background color in hex format.
+     */
+    function updateBackgroundOverlayState(backgroundColorHex) {
+        if (!container) return; // container is #scene-container
+
+        let activateOverlay = false;
+
+        // Check the main background color's luminance
+        if (getLuminance(backgroundColorHex) > LUMINANCE_THRESHOLD) {
+            activateOverlay = true;
+        }
+
+        // If background isn't light, check if any color in the palette is light
+        if (!activateOverlay) {
+            for (const color of colorPalette) {
+                if (getLuminance(color) > LUMINANCE_THRESHOLD) {
+                    activateOverlay = true;
+                    break;
+                }
+            }
+        }
+        container.classList.toggle('light-bg', activateOverlay);
+    }
+
+    /**
+     * Checks if two RGB colors are similar based on Euclidean distance.
+     * @param {number[]} rgb1 - First color as [r, g, b] array.
+     * @param {number[]} rgb2 - Second color as [r, g, b] array.
+     * @param {number} tolerance - Maximum distance for colors to be considered similar.
+     * @returns {boolean} True if colors are similar, false otherwise.
+     */
+    function areColorsSimilar(rgb1, rgb2, tolerance) {
+        if (!rgb1 || !rgb2 || rgb1.length !== 3 || rgb2.length !== 3) {
+            // console.warn("areColorsSimilar: Invalid color input.");
+            return false; 
+        }
+        const rDiff = rgb1[0] - rgb2[0];
+        const gDiff = rgb1[1] - rgb2[1];
+        const bDiff = rgb1[2] - rgb2[2];
+        const distance = Math.sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
+        return distance < tolerance;
+    }
+
+    /**
+     * Quadratic easing in-out function.
+     * @param {number} t - Progress ratio from 0 to 1.
+     * @returns {number} Eased progress ratio.
+     */
+    function easeInOutQuad(t) {
+        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    }
     // --- Initialize UI ---
     // UI elements like color pickers and sliders will be fully initialized
     // by performInitialSceneSetupIfNeeded based on Last.fm data or defaults.
-    function initializeColorPaletteUI(useRandomForInitial = false) { // Changed default to false
-        // Helper function to schedule cleanup, defined here for lexical scope if needed,
-        // or can be a global helper if preferred. For now, let's assume a global helper `scheduleOldColorCleanup` exists.
-        // If not, it would be:
-        // function localScheduleCleanup() {
-        //     previousColorPaletteForCleanup = [...colorPalette.map(c => c.toUpperCase())];
-        //     paletteChangeTimestampForCleanup = performance.now();
-        //     cleanupTriggeredForCurrentPaletteChange = false;
-        // }
-
+    function initializeColorPaletteUI() { 
         colorPaletteControlsContainer.innerHTML = '';
-        const FIXED_NON_RANDOM_FALLBACK = '#CCCCCC'; // Fallback if no other color source
 
-        for (let i = 0; i < NUM_PALETTE_COLORS; i++) {
-            let finalColorForUISlot;
+        // If colorPalette is empty (e.g., before any colors are loaded), 
+        // no pickers will be generated. This is generally fine as colorPalette
+        // should be populated by defaults or Last.fm before this is called meaningfully.
+        if (colorPalette.length === 0) {
+            // console.warn("initializeColorPaletteUI called with an empty colorPalette. No pickers will be generated.");
+            // Optionally, one could add a placeholder or a single picker for the background color here.
+        }
 
-            if (colorPalette[i]) {
-                // If a color already exists in the master palette for this slot, use it.
-                finalColorForUISlot = colorPalette[i];
-            } else {
-                // No color in the master palette for this slot.
-                // Decide what to put based on useRandomForInitial.
-                if (useRandomForInitial) {
-                    // Explicitly told to use random for initial population of empty slots
-                    finalColorForUISlot = getRandomHexColor();
-                } else {
-                    // Not using random: try to use corresponding defaultColorPalette slot,
-                    // or fall back to a fixed color if defaultColorPalette is also sparse.
-                    if (defaultColorPalette && defaultColorPalette[i]) {
-                        finalColorForUISlot = defaultColorPalette[i];
-                    } else {
-                        finalColorForUISlot = FIXED_NON_RANDOM_FALLBACK;
-                    }
-                }
-                colorPalette[i] = finalColorForUISlot; // Update the master palette
+        for (let i = 0; i < colorPalette.length; i++) {
+            const currentColorHex = colorPalette[i]; // The color is already in the master palette
+
+            if (!currentColorHex) {
+                // This case should ideally not happen if colorPalette is populated correctly.
+                // console.warn(`Color at index ${i} is undefined in colorPalette.`);
+                continue; 
             }
 
             const group = document.createElement('div');
@@ -290,13 +356,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const input = document.createElement('input');
             input.setAttribute('type', 'color');
             input.setAttribute('id', `color-picker-${i}`);
-            input.value = finalColorForUISlot; // Set the UI color picker value
+            input.value = currentColorHex; 
             input.dataset.index = i;
+
             input.addEventListener('input', (e) => {
                 const colorIndex = parseInt(e.target.dataset.index);
                 const newHexColor = e.target.value.toUpperCase();
-
-                if (colorPalette[colorIndex]?.toUpperCase() !== newHexColor) {
+                // Ensure the index is valid for the current colorPalette
+                if (colorIndex < colorPalette.length && colorPalette[colorIndex]?.toUpperCase() !== newHexColor) {
                     scheduleOldColorCleanup(); // Schedule cleanup before changing the palette
                     colorPalette[colorIndex] = newHexColor; // Update the master palette
                 }
@@ -351,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const BASE_MAX_ROTATION_SPEED = 0.01;
     const BASE_MIN_SPEED = 0.015625; // Scaled for 64x64 (was 0.125 for 512x512)
     const BASE_MAX_SPEED = 0.078125; // Scaled for 64x64 (was 0.625 for 512x512)
-    const SHAPE_TYPES = ['roundedRectangle', 'circle', 'ellipse', 'organic']; 
+    const SHAPE_TYPES = ['organic']; 
 
     function calculateRenderDimensions() {
         // Set rendering dimensions to a fixed 64x64
@@ -623,6 +690,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const shapesData = []; 
+    const fadingOutShapesData = []; // Array for shapes being cleaned up due to palette change
     const transitionShapesData = []; // Array to hold transition shapes
     let lastTime = performance.now(); 
     let frameCountForFPS = 0;
@@ -631,8 +699,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Helper function for color cleanup ---
     function scheduleOldColorCleanup() {
-        // Deep copy the current palette, ensuring uppercase for consistent comparison
-        previousColorPaletteForCleanup = colorPalette.map(color => color.toUpperCase());
+        if (colorPalette.length === 0) {
+            // If current palette is empty, shapes are likely using the fallback color.
+            // Treat the main fallback color as the "old color" to be cleaned up if the new palette has actual colors.
+            previousColorPaletteForCleanup = ['#CCCCCC'.toUpperCase()]; // Default fallback for initializeShape
+        } else {
+            // Deep copy the current palette, ensuring uppercase for consistent comparison
+            previousColorPaletteForCleanup = colorPalette.map(color => color.toUpperCase());
+        }
         paletteChangeTimestampForCleanup = performance.now();
         cleanupTriggeredForCurrentPaletteChange = false; // A new cleanup cycle is pending
         // console.log("Cleanup scheduled. Old palette snapshot:", previousColorPaletteForCleanup);
@@ -653,6 +727,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function initializeShape(shapeData) {
         if (shapeData.twoShape) two.remove(shapeData.twoShape);
         shapeData.needsReinitialization = false; // Reset reinitialization state
+        // For debugging the specific issue:
+        // if (shapeData.debugId) console.log(`DEBUG ${shapeData.debugId}: initializeShape called. Old color was ${shapeData.oldColorForDebug}, new palette first color ${colorPalette[0]}`);
+
         shapeData.isMarkedForCleanupScaling = false; // Reset cleanup scaling state
         shapeData.cleanupScaleStartTime = 0;       // Reset cleanup scaling start time
 
@@ -661,12 +738,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Halved factors to halve proportional scale on 512px canvas (original factors were 0.50, 1.10)
         const baseSize = getRandomFloat(minScreenDim * 0.25, minScreenDim * 0.55) * currentScaleMultiplier; 
         
-        // Use existing paletteIndex if available, otherwise assign a new one.
-        // This is crucial for replacement logic to pick up the correct new color.
-        if (typeof shapeData.paletteIndex === 'undefined' || shapeData.paletteIndex >= colorPalette.length || colorPalette.length === 0) {
-            shapeData.paletteIndex = colorPalette.length > 0 ? getRandomInt(0, colorPalette.length - 1) : 0;
+        // Always pick a color from the current palette. Do not rely on or store paletteIndex on shapeData.
+        let initialColorHex = '#CCCCCC'; // Default fallback color
+        if (colorPalette.length > 0) {
+            const colorIndex = getRandomInt(0, colorPalette.length - 1);
+            initialColorHex = colorPalette[colorIndex];
         }
-        const initialColorHex = (colorPalette.length > 0 ? colorPalette[shapeData.paletteIndex] : '#CCCCCC') || '#CCCCCC';
+
         let newTwoShape; let approxWidth, approxHeight; 
         switch (shapeType) {
             case 'circle':
@@ -715,30 +793,41 @@ document.addEventListener('DOMContentLoaded', () => {
         newTwoShape.opacity = 1; // Ensure new/recycled shapes are fully visible
         newTwoShape.fill = initialColorHex;
 
-        newTwoShape.noStroke(); newTwoShape.rotation = getRandomFloat(0, Math.PI * 2);
-        shapeData.twoShape = newTwoShape; // shapeData.paletteIndex is already set
+        newTwoShape.noStroke(); 
+        newTwoShape.rotation = getRandomFloat(0, Math.PI * 2);
+        shapeData.twoShape = newTwoShape; 
         shapeData.rotationSpeed = getRandomFloat(BASE_MIN_ROTATION_SPEED, BASE_MAX_ROTATION_SPEED) * currentRotationSpeedMultiplier * (Math.random() > 0.5 ? 1 : -1);
         shapeData.approxWidth = approxWidth; shapeData.approxHeight = approxHeight; // Store dimensions
         
         const speed = getRandomFloat(BASE_MIN_SPEED, BASE_MAX_SPEED) * currentMovementSpeedMultiplier;
-
+    
         if (isInitialShapeSpawn) {
-            // Spawn in the center for the very first load
-            const centerX = two.width / 2;
-            const centerY = two.height / 2;
-            // Spawn within a small radius around the center
-            const spawnRadius = Math.min(two.width, two.height) * 0.2; // Adjust radius as needed
-            const randomAngle = Math.random() * Math.PI * 2;
-            const randomDist = Math.random() * spawnRadius;
-
-            newTwoShape.translation.set(
-                centerX + Math.cos(randomAngle) * randomDist,
-                centerY + Math.sin(randomAngle) * randomDist
-            );
-            const velocityAngle = Math.random() * Math.PI * 2; // Random direction
-            shapeData.vx = Math.cos(velocityAngle) * speed;
-            shapeData.vy = Math.sin(velocityAngle) * speed;
+            // For initial spawn, 50% chance to spawn in center (dispersed), 50% at an edge
+            if (Math.random() < 0.5) {
+                // Spawn in the center (dispersed)
+                const centerX = two.width / 2;
+                const centerY = two.height / 2;
+                const spawnRadius = Math.min(two.width, two.height) * 0.2; // Adjust radius
+                const randomAngle = Math.random() * Math.PI * 2;
+                const randomDist = Math.random() * spawnRadius;
+    
+                newTwoShape.translation.set(
+                    centerX + Math.cos(randomAngle) * randomDist,
+                    centerY + Math.sin(randomAngle) * randomDist
+                );
+                const velocityAngle = Math.random() * Math.PI * 2; // Random direction
+                shapeData.vx = Math.cos(velocityAngle) * speed;
+                shapeData.vy = Math.sin(velocityAngle) * speed;
+            } else {
+                // Spawn at an edge
+                const offScreenOffset = Math.max(approxWidth, approxHeight) * 0.7;
+                const spawnConfig = spawnConfigurations[getRandomInt(0, spawnConfigurations.length - 1)];
+                newTwoShape.translation.set(spawnConfig.getX(two.width, two.height, offScreenOffset), spawnConfig.getY(two.width, two.height, offScreenOffset));
+                shapeData.vx = spawnConfig.getVX(speed);
+                shapeData.vy = spawnConfig.getVY(speed);
+            }
         } else {
+            // Normal non-initial spawning (always from edges)
             const offScreenOffset = Math.max(approxWidth, approxHeight) * 0.7; 
             const spawnConfig = spawnConfigurations[getRandomInt(0, spawnConfigurations.length - 1)];
             newTwoShape.translation.set(spawnConfig.getX(two.width, two.height, offScreenOffset), spawnConfig.getY(two.width, two.height, offScreenOffset));
@@ -746,7 +835,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (!newTwoShape.parent) two.add(newTwoShape);
     }
-    
     function initializeTransitionShape(shapeData) {
         // If a twoShape already exists (e.g., from a previous quick transition), remove it.
         if (shapeData.twoShape && shapeData.twoShape.parent) {
@@ -760,8 +848,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const baseSize = getRandomFloat(minScreenDim * 0.375, minScreenDim * 0.825) * currentScaleMultiplier;
 
         // Transition shapes use the current global colorPalette
-        shapeData.paletteIndex = colorPalette.length > 0 ? getRandomInt(0, colorPalette.length - 1) : 0;
-        const initialColorHex = (colorPalette.length > 0 ? colorPalette[shapeData.paletteIndex] : '#FFFFFF') || '#FFFFFF'; // Default to white if palette empty
+        // Always pick a color from the current palette. Do not rely on or store paletteIndex on shapeData.
+        let initialColorHex = '#FFFFFF'; // Default fallback for transition shapes
+        if (colorPalette.length > 0) {
+            const colorIndex = getRandomInt(0, colorPalette.length - 1);
+            initialColorHex = colorPalette[colorIndex];
+        }
 
         let newTwoShape; let approxWidth, approxHeight;
         switch (shapeType) {
@@ -827,12 +919,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function adjustShapesArray() {
         while (shapesData.length > currentNumShapes) { const shapeDataToRemove = shapesData.pop(); if (shapeDataToRemove.twoShape) two.remove(shapeDataToRemove.twoShape); }
         while (shapesData.length < currentNumShapes) { const shapeData = {}; shapesData.push(shapeData); initializeShape(shapeData); }
-        // Ensure all shapes have a valid paletteIndex, especially if palette was empty initially
-        // and colorPalette is now populated.
-        if (colorPalette.length > 0) {
-            shapesData.forEach(sd => { if (typeof sd.paletteIndex === 'undefined' || sd.paletteIndex >= colorPalette.length) initializeShape(sd); });
-        }
     }
+    deleteAllShapesBtn.addEventListener('click', () => {
+        while (shapesData.length > 0) { const shapeDataToRemove = shapesData.pop(); if (shapeDataToRemove.twoShape) two.remove(shapeDataToRemove.twoShape); }
+        while (fadingOutShapesData.length > 0) { const shapeDataToRemove = fadingOutShapesData.pop(); if (shapeDataToRemove.twoShape) two.remove(shapeDataToRemove.twoShape); } // Clear fading shapes too
+        if (onScreenShapeCountDisplay) onScreenShapeCountDisplay.textContent = '0';
+        adjustShapesArray(); 
+    });
 
     function spawnTransitionShapes() {
         // Clear existing transition shapes
@@ -874,8 +967,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 isBackgroundTransitioning = false;
                 currentAnimatedBackgroundColor = targetBackgroundColor; // Ensure it ends on the exact target
             }
+        } else {
+            // If not transitioning, ensure currentAnimatedBackgroundColor reflects the target.
+            // This handles cases where targetBackgroundColor might change without a formal transition start.
+            if (currentAnimatedBackgroundColor !== targetBackgroundColor) {
+                currentAnimatedBackgroundColor = targetBackgroundColor;
+            }
+        }
 
-            // Update old menu elements style and theme meta tag based on currentAnimatedBackgroundColor
+        // Update overlay state based on the final currentAnimatedBackgroundColor for this frame
+        updateBackgroundOverlayState(currentAnimatedBackgroundColor);
+
+        // Update old menu elements style and theme meta tag based on currentAnimatedBackgroundColor
+        if (typeof updateOldMenuElementsStyle === 'function') { // Check if function exists, useful during dev/refactor
             updateOldMenuElementsStyle();
             updateOldMenuThemeMetaTag();
         }
@@ -897,55 +1001,85 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cleanupTriggeredForCurrentPaletteChange && previousColorPaletteForCleanup.length > 0 && (currentTime - paletteChangeTimestampForCleanup > CLEANUP_START_DELAY)) {
             // console.log("Cleanup start delay met. Identifying shapes for scaling. Old palette:", previousColorPaletteForCleanup);
             const currentPaletteSet = new Set(colorPalette.map(c => c.toUpperCase())); // Set of current palette colors (uppercase)
-            let shapesMarkedForScaling = 0;
-            shapesData.forEach(sd => {
-                // Only consider shapes that are not already scaling down and have a visual representation
-                if (sd.twoShape && sd.twoShape.fill && !sd.isMarkedForCleanupScaling) {
-                    const shapeColor = sd.twoShape.fill.toUpperCase(); // Shape's color (uppercase)
+            let shapesMovedToFadeOut = 0;
 
+            // Iterate backwards as we are modifying shapesData by splicing
+            for (let i = shapesData.length - 1; i >= 0; i--) {
+                const sd = shapesData[i];
+                // Ensure shape has a visual representation and isn't already being processed (though it shouldn't be if in shapesData)
+                if (sd.twoShape && sd.twoShape.fill) {
+                    const shapeColor = sd.twoShape.fill.toUpperCase();
+    
                     // Check if the shape's color was in the old palette AND is NOT in the new palette.
                     if (previousColorPaletteForCleanup.includes(shapeColor) && !currentPaletteSet.has(shapeColor)) {
                         sd.isMarkedForCleanupScaling = true;
                         sd.cleanupScaleStartTime = currentTime;
-                        // Assuming original scale is 1 (Two.js default). If shapes could have other initial scales,
-                        // sd.originalScaleForCleanup = sd.twoShape.scale; would be needed here.
-                        shapesMarkedForScaling++;
+                        sd.cleanupScaleDuration = getRandomFloat(5000, 10000); // Varied lifetime 5-10 seconds
+                        
+                        fadingOutShapesData.push(sd); // Move to fadingOutShapesData
+                        shapesData.splice(i, 1);      // Remove from shapesData
+                        shapesMovedToFadeOut++;
                     }
                 }
-            });
-
-            if (shapesMarkedForScaling > 0) {
-                // console.log(`Marked ${shapesMarkedForScaling} shapes to start scaling down.`);
             }
+
+            if (shapesMovedToFadeOut > 0) {
+                // console.log(`Moved ${shapesMovedToFadeOut} shapes to fadingOutShapesData.`);
+                adjustShapesArray(); // Call to refill shapesData with new shapes
+            }
+
             cleanupTriggeredForCurrentPaletteChange = true; // Mark that this palette change's cleanup has been initiated
             previousColorPaletteForCleanup = []; // Clear the old palette; shapes are now individually managed for scaling
         }
 
-
-        shapesData.forEach(shapeData => {
-            // --- Delayed Old Color Cleanup Logic - Part 2: Process shapes that are scaling down ---
-            if (shapeData.isMarkedForCleanupScaling && shapeData.twoShape) {
+        // --- Process shapes that are fading out due to color cleanup ---
+        for (let i = fadingOutShapesData.length - 1; i >= 0; i--) {
+            const shapeData = fadingOutShapesData[i];
+            
+            if (shapeData.twoShape) { // Should always be true if logic is correct
                 const elapsedScalingTime = currentTime - shapeData.cleanupScaleStartTime;
-                let scaleProgress = Math.min(elapsedScalingTime / CLEANUP_SCALE_DURATION, 1);
+                let rawProgress = Math.min(elapsedScalingTime / shapeData.cleanupScaleDuration, 1);
+                let easedProgress = easeInOutQuad(rawProgress);
 
-                // Scale from 1 down to 0
-                shapeData.twoShape.scale = 1 - scaleProgress;
+                shapeData.twoShape.opacity = 1 - easedProgress;
 
-                if (scaleProgress >= 1) {
-                    // Scaling complete
+                // Optional: Continue moving/rotating fading shapes
+                shapeData.twoShape.translation.x += shapeData.vx * currentMovementSpeedMultiplier;
+                shapeData.twoShape.translation.y += shapeData.vy * currentMovementSpeedMultiplier;
+                shapeData.twoShape.rotation += shapeData.rotationSpeed * currentRotationSpeedMultiplier;
+
+                // Count for on-screen display if still visible and on screen
+                if (shapeData.twoShape.opacity > 0.01) {
+                    const shapeHalfWidth = shapeData.approxWidth / 2;
+                    const shapeHalfHeight = shapeData.approxHeight / 2;
+                    const shapeLeft = shapeData.twoShape.translation.x - shapeHalfWidth;
+                    const shapeRight = shapeData.twoShape.translation.x + shapeHalfWidth;
+                    const shapeTop = shapeData.twoShape.translation.y - shapeHalfHeight;
+                    const shapeBottom = shapeData.twoShape.translation.y + shapeHalfHeight;
+                    if (shapeRight > 0 && shapeLeft < two.width && shapeBottom > 0 && shapeTop < two.height) {
+                        currentOnScreenShapes++;
+                    }
+                }
+
+                if (rawProgress >= 1) { // Fade complete
                     if (shapeData.twoShape.parent) {
                         two.remove(shapeData.twoShape);
                     }
-                    shapeData.twoShape = null;
-                    shapeData.needsReinitialization = true;
-                    shapeData.isMarkedForCleanupScaling = false; // Reset flag
-                    // console.log("Shape cleanup scaling complete, marked for reinitialization.");
+                    fadingOutShapesData.splice(i, 1); // Remove from this array
                 }
-                return; // Skip normal movement/logic for shapes being scaled out
+            } else {
+                // Safeguard: remove if no twoShape (shouldn't happen)
+                fadingOutShapesData.splice(i, 1);
             }
+        }
 
-            // If shape is already marked for re-initialization, or has no Two.js object, skip main processing.
-            if (shapeData.needsReinitialization || !shapeData.twoShape) { // This handles shapes post-scaling or initially uninitialized
+        // --- Process regular shapes in shapesData ---
+        shapesData.forEach(shapeData => {
+            // Shapes in shapesData are active or placeholders.
+            // Cleanup scaling is handled by the fadingOutShapesData loop.
+            if (shapeData.needsReinitialization || !shapeData.twoShape) {
+                // This shapeData is a placeholder or its twoShape was removed (e.g., off-screen).
+                // Staggered re-initialization below will handle it.
                 return;
             }
 
@@ -959,15 +1093,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const shapeLeft = shape.translation.x - shapeHalfWidth; const shapeRight = shape.translation.x + shapeHalfWidth;
             const shapeTop = shape.translation.y - shapeHalfHeight; const shapeBottom = shape.translation.y + shapeHalfHeight;
             if (shapeRight > 0 && shapeLeft < two.width && shapeBottom > 0 && shapeTop < two.height) currentOnScreenShapes++;
-            
+
             // Off-screen check for re-initialization
-            const resetBuffer = Math.max(shapeData.approxWidth, shapeData.approxHeight) * 0.7; 
+            const resetBuffer = Math.max(shapeData.approxWidth, shapeData.approxHeight) * 0.7;
             const isWayOffScreen = shape.translation.x < -resetBuffer || shape.translation.x > two.width + resetBuffer || shape.translation.y < -resetBuffer || shape.translation.y > two.height + resetBuffer;
             if (isWayOffScreen) {
-                two.remove(shape);
+                if (shape.parent) two.remove(shape); // Ensure removal from Two.js scene
                 shapeData.twoShape = null;
                 shapeData.needsReinitialization = true;
-                return; // Done with this shape for this frame, marked for re-initialization
+                // This shapeData object remains in shapesData and will be re-initialized.
+                return; 
             }
         });
 
@@ -975,7 +1110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const maxReinitializationsThisFrame = Math.max(1, Math.floor(currentNumShapes / REINIT_BATCH_DIVISOR));
         let reinitializedThisFrameCount = 0;
         for (const sd of shapesData) {
-            if (sd.needsReinitialization && reinitializedThisFrameCount < maxReinitializationsThisFrame) {
+            if (sd.needsReinitialization && reinitializedThisFrameCount < maxReinitializationsThisFrame && !sd.twoShape) { // Ensure we only re-init if twoShape is null
                 initializeShape(sd); // This will create a new twoShape and clear needsReinitialization
                 reinitializedThisFrameCount++;
             }
@@ -1029,7 +1164,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (timeSinceLastFPSUpdate >= fpsUpdateInterval) {
             const fps = Math.round((frameCountForFPS * 1000) / timeSinceLastFPSUpdate);
             if (fpsDisplay) fpsDisplay.textContent = fps;
-            if (onScreenShapeCountDisplay) onScreenShapeCountDisplay.textContent = currentOnScreenShapes;
+            if (onScreenShapeCountDisplay) {
+                let displayText = currentOnScreenShapes.toString();
+                if (fadingOutShapesData.length > 0) {
+                    displayText += ` (${fadingOutShapesData.length})`;
+                }
+                onScreenShapeCountDisplay.textContent = displayText;
+            }
             if (onScreenTransitionShapeCountDisplay) {
                 onScreenTransitionShapeCountDisplay.textContent = currentOnScreenTransitionShapes;
             }
@@ -1198,7 +1339,7 @@ function applyDefaultColors() {
     previousBackgroundColorForTransition = currentAnimatedBackgroundColor;
     targetBackgroundColor = defaultBackgroundColor;
     backgroundColorTransitionStartTime = performance.now();
-    isBackgroundTransitioning = true;
+    isBackgroundTransitioning = true;    
     // Ensure defaultColorPalette itself contains uppercase hex strings if not already
     colorPalette = defaultColorPalette.length > 0 ? [...defaultColorPalette.map(c => c.toUpperCase())] : [];
     // If applying default colors, the UI palette should also reflect this.
@@ -1262,7 +1403,8 @@ function performInitialSceneSetupIfNeeded() {
     if (colorsAreReadyForSetup) {
         console.log(`Performing initial scene setup with ${setupType} colors.`);
         if (backgroundColorPicker) backgroundColorPicker.value = targetBackgroundColor;
-        initializeColorPaletteUI(false); // Use derived palette for UI
+        updateBackgroundOverlayState(targetBackgroundColor); // Set initial overlay state
+        initializeColorPaletteUI(); // Update UI based on the now populated colorPalette
         adjustShapesArray(); // Spawn shapes
         initialSceneSetupPerformed = true; // Mark that initial setup is done
         isInitialShapeSpawn = false; // After first setup, subsequent spawns are not initial
@@ -1279,13 +1421,11 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
     img.crossOrigin = "Anonymous"; // Important for ColorThief
     img.src = imageUrl;
 
-    // Use a temporary palette array during extraction to avoid modifying
-    // the main colorPalette until extraction is successful.
-    let tempColorPalette = [];
+    let tempColorPaletteHolder = []; // To hold colors during extraction
     img.onload = () => {
         try {
             const dominantColorRgb = colorThief.getColor(img);
-            const paletteRgb = colorThief.getPalette(img, NUM_PALETTE_COLORS);
+            const paletteRgb = colorThief.getPalette(img, MAX_PALETTE_COLORS_TO_REQUEST);
 
             previousBackgroundColorForTransition = currentAnimatedBackgroundColor;
             targetBackgroundColor = rgbToHex(dominantColorRgb[0], dominantColorRgb[1], dominantColorRgb[2]).toUpperCase();
@@ -1294,17 +1434,40 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
             
             scheduleOldColorCleanup(); // Schedule cleanup before changing the palette
 
-            tempColorPalette = new Array(NUM_PALETTE_COLORS);
-            for (let i = 0; i < NUM_PALETTE_COLORS; i++) {
-                if (paletteRgb && paletteRgb[i]) {
-                    tempColorPalette[i] = rgbToHex(paletteRgb[i][0], paletteRgb[i][1], paletteRgb[i][2]);
-                } else {
-                    // Fallback: Use a random color if palette is too small
-                    tempColorPalette[i] = getRandomHexColor().toUpperCase();
+            let uniquePaletteRgb = [];
+            if (paletteRgb && paletteRgb.length > 0) {
+                for (const candidateRgb of paletteRgb) {
+                    let isUnique = true;
+                    for (const existingRgb of uniquePaletteRgb) {
+                        if (areColorsSimilar(candidateRgb, existingRgb, COLOR_SIMILARITY_TOLERANCE)) {
+                            isUnique = false;
+                            break;
+                        }
+                    }
+                    if (isUnique) {
+                        uniquePaletteRgb.push(candidateRgb);
+                    }
                 }
             }
-            colorPalette = tempColorPalette.map(c => c.toUpperCase()); // Assign the fully formed new palette (uppercase)
 
+            tempColorPaletteHolder = []; // Initialize to hold hex colors
+            if (uniquePaletteRgb.length > 0) {
+                uniquePaletteRgb.forEach(rgb => {
+                    tempColorPaletteHolder.push(rgbToHex(rgb[0], rgb[1], rgb[2]));
+                });
+            } else {
+                // Fallback if no unique colors are found after filtering,
+                // or if ColorThief initially returned no palette.
+                if (targetBackgroundColor) { // Use dominant color as the primary fallback
+                    tempColorPaletteHolder.push(targetBackgroundColor);
+                } else if (paletteRgb && paletteRgb.length > 0) { // If dominant failed but original palette had something
+                    tempColorPaletteHolder.push(rgbToHex(paletteRgb[0][0], paletteRgb[0][1], paletteRgb[0][2]));
+                } else { // Absolute fallback
+                    tempColorPaletteHolder.push('#CCCCCC');
+                }
+            }
+            colorPalette = tempColorPaletteHolder.map(c => c.toUpperCase()); // Assign the new dynamic palette
+            console.log(`Extracted ${colorPalette.length} colors from album art.`); // Log the number of colors
             if (backgroundColorPicker) {
                 backgroundColorPicker.value = targetBackgroundColor;
             }
@@ -1314,7 +1477,7 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
             } else {
                 firstLastFmColorChangeDone = true; // Mark that the first color change has happened
             }
-            initializeColorPaletteUI(false); // Update palette UI with new colors
+            initializeColorPaletteUI(); // Update palette UI with new colors
 
             // applyBlurEffect will be handled by the animation loop for smooth transition
 
@@ -1323,6 +1486,7 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
             // If this is the very first successful fetch with album art, ensure scene setup happens
             performInitialSceneSetupIfNeeded(); 
 
+
         } catch (e) {
             console.error("Error processing image with ColorThief:", e);
             // Fallback to default colors on ColorThief error
@@ -1330,6 +1494,7 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
             lastFmArtProcessing = false; // Art processing finished (with error)
             performInitialSceneSetupIfNeeded(); // Re-evaluate initial setup state
         }
+
     };
     img.onerror = () => {
         console.error("Failed to load album art image for color extraction:", imageUrl);
@@ -1339,6 +1504,7 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
         // applyDefaultColors() will be called by updateLastFmUI or fetchLastFmData if this path leads to no art.
         // The important part here is that lastFmArtProcessing is false so performInitialSceneSetupIfNeeded can proceed with defaults if ready.
         performInitialSceneSetupIfNeeded(); // Re-evaluate initial setup state
+
     };
 }
 
@@ -1350,7 +1516,33 @@ function loadDefaultColors() {
     img.onload = () => {
         try {
             defaultBackgroundColor = rgbToHex(...colorThief.getColor(img)).toUpperCase();
-            defaultColorPalette = colorThief.getPalette(img, NUM_PALETTE_COLORS).map(c => rgbToHex(...c).toUpperCase());
+            const paletteRgb = colorThief.getPalette(img, MAX_PALETTE_COLORS_TO_REQUEST);
+            let uniqueDefaultPaletteRgb = [];
+            
+            if (paletteRgb && paletteRgb.length > 0) {
+                for (const candidateRgb of paletteRgb) {
+                    let isUnique = true;
+                    for (const existingRgb of uniqueDefaultPaletteRgb) {
+                        if (areColorsSimilar(candidateRgb, existingRgb, COLOR_SIMILARITY_TOLERANCE)) {
+                            isUnique = false;
+                            break;
+                        }
+                    }
+                    if (isUnique) {
+                        uniqueDefaultPaletteRgb.push(candidateRgb);
+                    }
+                }
+            }
+
+            if (uniqueDefaultPaletteRgb.length > 0) {
+                defaultColorPalette = uniqueDefaultPaletteRgb.map(c => rgbToHex(...c).toUpperCase());
+            } else {
+                // Fallback if ColorThief returns no palette for the default image
+                // or if all colors were too similar.
+                if (defaultBackgroundColor) { defaultColorPalette = [defaultBackgroundColor]; }
+                else { defaultColorPalette = ['#CCCCCC']; } // Absolute fallback
+            }
+
             defaultColorsLoaded = true;
             console.log("Default colors loaded successfully.");
         } catch (e) { console.error("Error loading default colors:", e); }

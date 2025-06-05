@@ -36,6 +36,22 @@ body {
     width: 100%; height: 100%;
     top: 0; left: 0;
 }
+/* Overlay for dimming light backgrounds/palettes for text readability */
+#scene-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0); /* Transparent by default */
+  z-index: 1; /* Ensures it's above blur layers/canvas within #scene-container */
+  pointer-events: none; /* Allows interactions with elements behind it */
+  transition: background-color 10s ease-in-out; /* Smooth transition for the dimming effect */
+}
+#scene-container.light-bg::before {
+  background-color: rgba(0, 0, 0, 0.3); /* Adjust opacity for desired dimming */
+}
 canvas {
     display: block; 
 }
@@ -408,7 +424,7 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
       width: 100%; /* Make the container span full viewport width */
       /* overflow-y: auto; is inherited and will allow scrolling */
       /* Adjust padding-top for mobile. var(--s) is 37.5px here. */
-      padding-top: calc(2 * var(--s)); /* Create space for mask, similar to desktop (padding = 2 * mask fade distance) */
+      padding-top: calc(var(--s) / 2); /* Offset by half the signature height */
   }
 
   .b {
