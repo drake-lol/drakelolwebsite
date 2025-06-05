@@ -417,7 +417,6 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
       flex-direction: column;
       align-items: center;
       left: 0; /* Align to the left edge */
-      top: calc(2 * var(--s)); /* Position below the signature */
       transform: none; /* Remove horizontal centering transform for the container */
       bottom: 0; /* Extend to viewport bottom, defining the height with top */
       justify-content: center; /* Vertically center buttons within this defined space */
