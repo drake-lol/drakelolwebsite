@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hslColor.s < 0.01) { // Threshold for considering it grayscale
             finalSaturationForMenu = 0; // Make menu text grayscale as well
         } else {
-            finalSaturationForMenu = 1.0; // Max saturation for colored backgrounds
+            finalSaturationForMenu = 1.0; // Max saturation value for colored backgrounds
         }
 
         const finalColorHex = hslToHex(hslColor.h, finalSaturationForMenu, targetLightness);
