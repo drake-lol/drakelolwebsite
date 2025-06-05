@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetLightness = 0.85; // 90% brightness
         let finalSaturationForMenu;
 
-        // If the background color's saturation is very lows (i.e., it's grayscale)
+        // If the background color's saturation is very low (i.e., it's grayscale)
         if (hslColor.s < 0.01) { // Threshold for considering it grayscale
             finalSaturationForMenu = 0; // Make menu text grayscale as well
         } else {
