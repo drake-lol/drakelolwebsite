@@ -303,7 +303,7 @@ canvas {
 
 .b-c { /* Button container for old menu links */
   position: fixed; /* Changed from default to fixed */
-  top: calc(2 * var(--s) + 150px); /* Position from top of viewport */
+  top: calc(2 * var(--s)); /* Position from top of viewport, aligned with signature bottom */
   left: var(--s); /* Position from left of viewport */
   right: 0; /* Extend to the right edge of the viewport */
   display: flex;
@@ -311,9 +311,13 @@ canvas {
   align-items: flex-start;
   z-index: 3; /* Same as signature */
   gap: 0;
+  padding-top: 150px; /* Add blank space at the top, same as original offset */
   /* max-width: 100%; /* Not strictly needed for fixed positioning unless content overflows */
-  max-height: calc(100vh - (2 * var(--s) + 150px)); /* Max height for desktop, extends to bottom from its top position */
+  max-height: calc(100vh - (2 * var(--s))); /* Max height for desktop, extends to bottom from its new top position */
   overflow-y: auto; /* Allow vertical scrolling if content exceeds max-height */
+  /* Add mask to fade content at the top, appearing to scroll under the signature */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
+  mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   box-sizing: border-box;
   font-family: Fustat, sans-serif; /* Apply Fustat font */
   /* Hide scrollbar for Firefox */
@@ -389,20 +393,22 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
   .signature-container {
       left: 50%;
       transform: translateX(-50%);
-      top: var(--s);
+      top: var(--s); /* Make signature visible and position it */
+      /* display: none; // Removed to make signature visible */
   }
 
   .b-c {
       flex-direction: column;
       align-items: center;
       left: 0; /* Align to the left edge */
-      /* New positioning to be below signature and extend downwards */
-      top: calc(2 * var(--s) + 20px); /* Position below signature + 20px padding */
+      top: calc(2 * var(--s)); /* Position below the signature */
       transform: none; /* Remove horizontal centering transform for the container */
       bottom: 0; /* Extend to viewport bottom, defining the height with top */
       justify-content: center; /* Vertically center buttons within this defined space */
       width: 100%; /* Make the container span full viewport width */
       /* overflow-y: auto; is inherited and will allow scrolling */
+      /* Adjust padding-top for mobile. var(--s) is 37.5px here. */
+      padding-top: calc(2 * var(--s)); /* Create space for mask, similar to desktop (padding = 2 * mask fade distance) */
   }
 
   .b {

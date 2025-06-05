@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentRotationSpeedMultiplier = 1.0;
     let currentMovementSpeedMultiplier = 1.0;
     let currentNumTransitionShapes = 10; // Default, will be synced with slider
-    let currentBlurIntensity = 200; // Default blur intensity changed to 200px
+    let currentBlurIntensity = 200; // Default blur intensity scaled for 64x64 canvas (was 200px for 512x512)
 
     // Post-processing state variables
     let currentBrightness = 50; // %
@@ -110,6 +110,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let defaultColorsLoaded = false; // New flag
     let defaultColorPalette = []; // Will be updated from default image
 
+    // Variables for delayed old color cleanup
+    let previousColorPaletteForCleanup = []; // Stores the palette before the most recent change
+    let paletteChangeTimestampForCleanup = 0; // Timestamp of the last palette change
+    let cleanupTriggeredForCurrentPaletteChange = true; // True if cleanup for the current old_palette has been initiated (or not needed)
+    const CLEANUP_START_DELAY = 5000; // 5 seconds delay before starting to scale down old shapes
+    const CLEANUP_SCALE_DURATION = 10000; // 10 seconds duration for shapes to scale down
     // Corner image tap tracking for debug menu
     let cornerImageTapCount = 0;
     let lastCornerImageTapTime = 0;
@@ -117,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const REQUIRED_TAPS_FOR_DEBUG = 7;
 
     let dynamicBlurLayers = []; // To store dynamically created blur layers
-    const MAX_BLUR_PER_LAYER = 50; // Max blur (px) per individual layer
+    const MAX_BLUR_PER_LAYER = 50; // Max blur (px) per layer, scaled for 64x64 (was 50px for 512x512)
 
     // --- START: Old Menu Integration ---
     const OLD_MENU_FAVICON_BASE_SRC = '/assets/favicon/full_blue_trans_square_128.png';
@@ -184,11 +190,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const baseColorHex = currentAnimatedBackgroundColor || '#121212'; // Use current animated background
         const hslColor = hexToHSL(baseColorHex);
         
-        // Set desired lightness and saturation for the menu text/signature.
-        // Saturation is capped at 1.0 (100%) in the HSL model.
         const targetLightness = 0.85; // 90% brightness
-        const targetSaturation = 1.0; // Max saturation (interpreting "200%" as fully saturated in HSL)
-        const finalColorHex = hslToHex(hslColor.h, targetSaturation, targetLightness);
+        let finalSaturationForMenu;
+
+        // If the background color's saturation is very low (i.e., it's grayscale)
+        if (hslColor.s < 0.01) { // Threshold for considering it grayscale
+            finalSaturationForMenu = 0; // Make menu text grayscale as well
+        } else {
+            finalSaturationForMenu = 1.0; // Max saturation for colored backgrounds
+        }
+
+        const finalColorHex = hslToHex(hslColor.h, finalSaturationForMenu, targetLightness);
 
         if (oldMenuLinkElements) {
             oldMenuLinkElements.forEach(el => el.style.color = finalColorHex);
@@ -232,6 +244,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // UI elements like color pickers and sliders will be fully initialized
     // by performInitialSceneSetupIfNeeded based on Last.fm data or defaults.
     function initializeColorPaletteUI(useRandomForInitial = false) { // Changed default to false
+        // Helper function to schedule cleanup, defined here for lexical scope if needed,
+        // or can be a global helper if preferred. For now, let's assume a global helper `scheduleOldColorCleanup` exists.
+        // If not, it would be:
+        // function localScheduleCleanup() {
+        //     previousColorPaletteForCleanup = [...colorPalette.map(c => c.toUpperCase())];
+        //     paletteChangeTimestampForCleanup = performance.now();
+        //     cleanupTriggeredForCurrentPaletteChange = false;
+        // }
+
         colorPaletteControlsContainer.innerHTML = '';
         const FIXED_NON_RANDOM_FALLBACK = '#CCCCCC'; // Fallback if no other color source
 
@@ -271,9 +292,12 @@ document.addEventListener('DOMContentLoaded', () => {
             input.dataset.index = i;
             input.addEventListener('input', (e) => {
                 const colorIndex = parseInt(e.target.dataset.index);
-                const newHexColor = e.target.value;
-                // const oldHexColor = colorPalette[colorIndex]; // oldHexColor not used
-                colorPalette[colorIndex] = newHexColor; // Update the master palette
+                const newHexColor = e.target.value.toUpperCase();
+
+                if (colorPalette[colorIndex]?.toUpperCase() !== newHexColor) {
+                    scheduleOldColorCleanup(); // Schedule cleanup before changing the palette
+                    colorPalette[colorIndex] = newHexColor; // Update the master palette
+                }
             });
             group.appendChild(label);
             group.appendChild(input);
@@ -295,23 +319,19 @@ document.addEventListener('DOMContentLoaded', () => {
     rotationValueDisplay.textContent = currentRotationSpeedMultiplier.toFixed(1);
     speedSlider.value = currentMovementSpeedMultiplier;
     speedValueDisplay.textContent = currentMovementSpeedMultiplier.toFixed(1);
-    blurIntensitySlider.value = currentBlurIntensity;
 
     if (numTransitionShapesSlider) {
         numTransitionShapesSlider.value = currentNumTransitionShapes;
         if (numTransitionShapesValueDisplay) {
             numTransitionShapesValueDisplay.textContent = currentNumTransitionShapes;
         }
-        numTransitionShapesSlider.addEventListener('input', (e) => {
-            currentNumTransitionShapes = parseInt(e.target.value);
-            if (numTransitionShapesValueDisplay) {
-                numTransitionShapesValueDisplay.textContent = currentNumTransitionShapes;
-            }
-        });
+        // Event listener for numTransitionShapesSlider is correctly placed later
     }
+    blurIntensitySlider.value = currentBlurIntensity; // Set slider to new default
     blurIntensityValueDisplay.textContent = currentBlurIntensity;
-    // NOTE: Ensure in your HTML, the blur-intensity-slider has max="300"
-    // e.g., <input type="range" id="blur-intensity-slider" min="0" max="300" value="200">
+    // NOTE: For 64x64 canvas, consider adjusting the HTML max attribute for blur-intensity-slider.
+    // e.g., <input type="range" id="blur-intensity-slider" min="0" max="75" value="25">
+    // Original was max="300" for a 512x512 canvas and 200px default blur.
 
     brightnessSlider.value = currentBrightness;
     brightnessValueDisplay.textContent = currentBrightness;
@@ -327,13 +347,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const BASE_MIN_ROTATION_SPEED = 0.002; 
     const BASE_MAX_ROTATION_SPEED = 0.01;
-    const BASE_MIN_SPEED = 0.25; // Halved again
-    const BASE_MAX_SPEED = 1.25; // Halved again
+    const BASE_MIN_SPEED = 0.015625; // Scaled for 64x64 (was 0.125 for 512x512)
+    const BASE_MAX_SPEED = 0.078125; // Scaled for 64x64 (was 0.625 for 512x512)
     const SHAPE_TYPES = ['roundedRectangle', 'circle', 'ellipse', 'organic']; 
 
     function calculateRenderDimensions() {
-        // Set rendering dimensions to a fixed 512x512
-        return { width: 512, height: 512 };
+        // Set rendering dimensions to a fixed 64x64
+        return { width: 64, height: 64 };
     }
     
     const initialRenderDims = calculateRenderDimensions();
@@ -460,6 +480,15 @@ document.addEventListener('DOMContentLoaded', () => {
         blurIntensityValueDisplay.textContent = currentBlurIntensity;
         applyBlurEffect(currentAnimatedBackgroundColor); 
     });
+    // Ensure numTransitionShapesSlider event listener is here if it wasn't before or was misplaced
+    if (numTransitionShapesSlider) {
+        numTransitionShapesSlider.addEventListener('input', (e) => {
+            currentNumTransitionShapes = parseInt(e.target.value);
+            if (numTransitionShapesValueDisplay) {
+                numTransitionShapesValueDisplay.textContent = currentNumTransitionShapes;
+            }
+        }); // Closes the event listener
+    } // Closes the if block
     backgroundColorPicker.addEventListener('input', (e) => {
         previousBackgroundColorForTransition = currentAnimatedBackgroundColor;
         targetBackgroundColor = e.target.value;
@@ -589,6 +618,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const fpsUpdateInterval = 1000; 
     let timeSinceLastFPSUpdate = 0;
 
+    // --- Helper function for color cleanup ---
+    function scheduleOldColorCleanup() {
+        // Deep copy the current palette, ensuring uppercase for consistent comparison
+        previousColorPaletteForCleanup = colorPalette.map(color => color.toUpperCase());
+        paletteChangeTimestampForCleanup = performance.now();
+        cleanupTriggeredForCurrentPaletteChange = false; // A new cleanup cycle is pending
+        // console.log("Cleanup scheduled. Old palette snapshot:", previousColorPaletteForCleanup);
+    }
+
     function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
     function getRandomFloat(min, max) { return Math.random() * (max - min) + min; }
 
@@ -604,6 +642,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function initializeShape(shapeData) {
         if (shapeData.twoShape) two.remove(shapeData.twoShape);
         shapeData.needsReinitialization = false; // Reset reinitialization state
+        shapeData.isMarkedForCleanupScaling = false; // Reset cleanup scaling state
+        shapeData.cleanupScaleStartTime = 0;       // Reset cleanup scaling start time
+
         const shapeType = SHAPE_TYPES[getRandomInt(0, SHAPE_TYPES.length - 1)];
         const minScreenDim = Math.min(two.width, two.height) || 600; // Fallback if dimensions are 0, e.g. initial load
         // Halved factors to halve proportional scale on 512px canvas (original factors were 0.50, 1.10)
@@ -742,7 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
         shapeData.rotationSpeed = getRandomFloat(BASE_MIN_ROTATION_SPEED, BASE_MAX_ROTATION_SPEED) * currentRotationSpeedMultiplier * 1.5 * (Math.random() > 0.5 ? 1 : -1);
         shapeData.approxWidth = approxWidth;
         shapeData.approxHeight = approxHeight;
-        const speed = getRandomFloat(BASE_MIN_SPEED, BASE_MAX_SPEED) * currentMovementSpeedMultiplier * 1.2; // Slightly faster
+        const speed = getRandomFloat(BASE_MIN_SPEED, BASE_MAX_SPEED) * currentMovementSpeedMultiplier * 2.4; // Adjusted to maintain original absolute speed (was 1.2)
 
         // Spawn off-screen using a similar mechanism to regular shapes
         const offScreenOffset = Math.max(approxWidth, approxHeight) * 0.7;
@@ -821,11 +862,59 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // --- Delayed Old Color Cleanup Logic - Part 1: Identify and mark shapes for scaling ---
+        if (!cleanupTriggeredForCurrentPaletteChange && previousColorPaletteForCleanup.length > 0 && (currentTime - paletteChangeTimestampForCleanup > CLEANUP_START_DELAY)) {
+            // console.log("Cleanup start delay met. Identifying shapes for scaling. Old palette:", previousColorPaletteForCleanup);
+            const currentPaletteSet = new Set(colorPalette.map(c => c.toUpperCase())); // Set of current palette colors (uppercase)
+            let shapesMarkedForScaling = 0;
+            shapesData.forEach(sd => {
+                // Only consider shapes that are not already scaling down and have a visual representation
+                if (sd.twoShape && sd.twoShape.fill && !sd.isMarkedForCleanupScaling) {
+                    const shapeColor = sd.twoShape.fill.toUpperCase(); // Shape's color (uppercase)
+
+                    // Check if the shape's color was in the old palette AND is NOT in the new palette.
+                    if (previousColorPaletteForCleanup.includes(shapeColor) && !currentPaletteSet.has(shapeColor)) {
+                        sd.isMarkedForCleanupScaling = true;
+                        sd.cleanupScaleStartTime = currentTime;
+                        // Assuming original scale is 1 (Two.js default). If shapes could have other initial scales,
+                        // sd.originalScaleForCleanup = sd.twoShape.scale; would be needed here.
+                        shapesMarkedForScaling++;
+                    }
+                }
+            });
+
+            if (shapesMarkedForScaling > 0) {
+                // console.log(`Marked ${shapesMarkedForScaling} shapes to start scaling down.`);
+            }
+            cleanupTriggeredForCurrentPaletteChange = true; // Mark that this palette change's cleanup has been initiated
+            previousColorPaletteForCleanup = []; // Clear the old palette; shapes are now individually managed for scaling
+        }
+
 
         shapesData.forEach(shapeData => {
+            // --- Delayed Old Color Cleanup Logic - Part 2: Process shapes that are scaling down ---
+            if (shapeData.isMarkedForCleanupScaling && shapeData.twoShape) {
+                const elapsedScalingTime = currentTime - shapeData.cleanupScaleStartTime;
+                let scaleProgress = Math.min(elapsedScalingTime / CLEANUP_SCALE_DURATION, 1);
+
+                // Scale from 1 down to 0
+                shapeData.twoShape.scale = 1 - scaleProgress;
+
+                if (scaleProgress >= 1) {
+                    // Scaling complete
+                    if (shapeData.twoShape.parent) {
+                        two.remove(shapeData.twoShape);
+                    }
+                    shapeData.twoShape = null;
+                    shapeData.needsReinitialization = true;
+                    shapeData.isMarkedForCleanupScaling = false; // Reset flag
+                    // console.log("Shape cleanup scaling complete, marked for reinitialization.");
+                }
+                return; // Skip normal movement/logic for shapes being scaled out
+            }
+
             // If shape is already marked for re-initialization, or has no Two.js object, skip main processing.
-            // It will be handled by the staggered re-initialization logic later.
-            if (shapeData.needsReinitialization || !shapeData.twoShape) {
+            if (shapeData.needsReinitialization || !shapeData.twoShape) { // This handles shapes post-scaling or initially uninitialized
                 return;
             }
 
@@ -919,18 +1008,35 @@ document.addEventListener('DOMContentLoaded', () => {
         // It's now updated with the FPS counter.
     });
 
-    window.addEventListener('resize', () => {
-        const newRenderDims = calculateRenderDimensions();
-        two.width = newRenderDims.width;
-        two.height = newRenderDims.height;
+    let resizeDebounceTimer;
+    const DEBOUNCE_DELAY = 250; // milliseconds
 
-        if (twoJsCanvas) {
-            applyBlurEffect(currentAnimatedBackgroundColor); 
-        }
-        if (debugMenu.offsetLeft + debugMenu.offsetWidth > window.innerWidth) debugMenu.style.left = (window.innerWidth - debugMenu.offsetWidth) + 'px';
-        if (debugMenu.offsetTop + debugMenu.offsetHeight > window.innerHeight) debugMenu.style.top = (window.innerHeight - debugMenu.offsetHeight) + 'px';
-        if (debugMenu.offsetLeft < 0) debugMenu.style.left = '0px';
-        if (debugMenu.offsetTop < 0) debugMenu.style.top = '0px';
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeDebounceTimer);
+        resizeDebounceTimer = setTimeout(() => {
+            const newRenderDims = calculateRenderDimensions();
+            // It's important that two.width and two.height are updated immediately
+            // for Two.js internal calculations, even if the visual effect (blur) is debounced.
+            // However, since calculateRenderDimensions() returns fixed 64x64,
+            // these lines might not even be strictly necessary if Two.js doesn't
+            // re-evaluate its internal viewport based on these if they don't change.
+            // For safety, we'll keep them, but the main performance gain comes from
+            // debouncing applyBlurEffect.
+            if (two.width !== newRenderDims.width || two.height !== newRenderDims.height) {
+                two.width = newRenderDims.width;
+                two.height = newRenderDims.height;
+            }
+
+            if (twoJsCanvas) {
+                applyBlurEffect(currentAnimatedBackgroundColor);
+            }
+
+            // Adjust debug menu position
+            if (debugMenu.offsetLeft + debugMenu.offsetWidth > window.innerWidth) debugMenu.style.left = (window.innerWidth - debugMenu.offsetWidth) + 'px';
+            if (debugMenu.offsetTop + debugMenu.offsetHeight > window.innerHeight) debugMenu.style.top = (window.innerHeight - debugMenu.offsetHeight) + 'px';
+            if (debugMenu.offsetLeft < 0) debugMenu.style.left = '0px';
+            if (debugMenu.offsetTop < 0) debugMenu.style.top = '0px';
+        }, DEBOUNCE_DELAY);
     });
 
     // --- Last.fm Integration Functions (moved inside DOMContentLoaded) ---
@@ -1057,11 +1163,13 @@ function resetLastFmInterval() {
 }
 
 function applyDefaultColors() {
+    scheduleOldColorCleanup(); // Schedule cleanup before changing the palette
     previousBackgroundColorForTransition = currentAnimatedBackgroundColor;
     targetBackgroundColor = defaultBackgroundColor;
     backgroundColorTransitionStartTime = performance.now();
     isBackgroundTransitioning = true;
-    colorPalette = defaultColorPalette.length > 0 ? [...defaultColorPalette] : []; // Use a copy, ensure fallback if default still loading
+    // Ensure defaultColorPalette itself contains uppercase hex strings if not already
+    colorPalette = defaultColorPalette.length > 0 ? [...defaultColorPalette.map(c => c.toUpperCase())] : [];
     // If applying default colors, the UI palette should also reflect this.
     initializeColorPaletteUI(false); // Update UI pickers to show default palette (or random if defaults not loaded)
 }
@@ -1148,10 +1256,11 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
             const paletteRgb = colorThief.getPalette(img, NUM_PALETTE_COLORS);
 
             previousBackgroundColorForTransition = currentAnimatedBackgroundColor;
-            targetBackgroundColor = rgbToHex(dominantColorRgb[0], dominantColorRgb[1], dominantColorRgb[2]);
+            targetBackgroundColor = rgbToHex(dominantColorRgb[0], dominantColorRgb[1], dominantColorRgb[2]).toUpperCase();
             backgroundColorTransitionStartTime = performance.now();
             isBackgroundTransitioning = true;
-            // Color palette will be updated next, then shapes spawned.
+            
+            scheduleOldColorCleanup(); // Schedule cleanup before changing the palette
 
             tempColorPalette = new Array(NUM_PALETTE_COLORS);
             for (let i = 0; i < NUM_PALETTE_COLORS; i++) {
@@ -1159,10 +1268,10 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
                     tempColorPalette[i] = rgbToHex(paletteRgb[i][0], paletteRgb[i][1], paletteRgb[i][2]);
                 } else {
                     // Fallback: Use a random color if palette is too small
-                    tempColorPalette[i] = getRandomHexColor();
+                    tempColorPalette[i] = getRandomHexColor().toUpperCase();
                 }
             }
-            colorPalette = tempColorPalette; // Assign the fully formed new palette
+            colorPalette = tempColorPalette.map(c => c.toUpperCase()); // Assign the fully formed new palette (uppercase)
 
             if (backgroundColorPicker) {
                 backgroundColorPicker.value = targetBackgroundColor;
@@ -1208,8 +1317,8 @@ function loadDefaultColors() {
     img.src = DEFAULT_IMAGE_URL;
     img.onload = () => {
         try {
-            defaultBackgroundColor = rgbToHex(...colorThief.getColor(img));
-            defaultColorPalette = colorThief.getPalette(img, NUM_PALETTE_COLORS).map(c => rgbToHex(...c));
+            defaultBackgroundColor = rgbToHex(...colorThief.getColor(img)).toUpperCase();
+            defaultColorPalette = colorThief.getPalette(img, NUM_PALETTE_COLORS).map(c => rgbToHex(...c).toUpperCase());
             defaultColorsLoaded = true;
             console.log("Default colors loaded successfully.");
         } catch (e) { console.error("Error loading default colors:", e); }
