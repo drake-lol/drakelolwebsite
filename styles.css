@@ -1,6 +1,26 @@
 :root {
   --s: 75px; /* For old menu positioning and sizing */
+
+  /* Material You 3 Dark Theme Inspired Colors for Debug Menu */
+  --m3-surface: #2B2930; /* Elevated surfaces like menus */
+  --m3-surface-container-high: #36343B; /* Slightly lighter, for elements like title bars */
+  --m3-on-surface: #E6E1E5; /* Text and icons on surface colors */
+  --m3-on-surface-variant: #CAC4D0; /* Less prominent text and icons */
+  --m3-primary: #D0BCFF; /* Key accent color for interactive elements */
+  --m3-on-primary: #381E72; /* Text/icons on primary color */
+  --m3-secondary-container: #4A4458; /* Tonal buttons, less emphasis than primary */
+  --m3-on-secondary-container: #E8DEF8; /* Text/icons on secondary container */
+  --m3-outline: #79747E; /* Borders and dividers */
+  --m3-error: #F2B8B5; /* Error text and icons */
+  --m3-error-container: #601410; /* Background for error elements */
+  --m3-on-error-container: #F9DEDC; /* Text/icons on error container */
+
+  /* State Layers (Opacity for hover/focus/pressed states) */
+  --m3-state-hover-on-surface-opacity: 0.08;
+  --m3-state-hover-on-secondary-container-opacity: 0.08;
+  --m3-state-hover-error-opacity: 0.08;
 }
+
 
 body {
     margin: 0;
@@ -60,50 +80,49 @@ canvas {
     /* Default position, will be restored by JS if needed */
     top: 20px;
     left: 20px;
-    /* Ensure debug menu is above blur layers if they use z-index, though not strictly necessary with current setup */
-    z-index: 10; 
-    background-color: rgba(40, 40, 40, 0.75); 
-    color: #EAEAEA; 
-    border: 1px solid rgba(100, 100, 100, 0.5); 
-    border-radius: 8px; 
-    font-size: 13px; 
+    background-color: var(--m3-surface);
+    color: var(--m3-on-surface);
+    border: 1px solid var(--m3-outline);
+    border-radius: 16px; /* M3 Medium Shape */
+    font-size: 14px; /* M3 Body Medium */
     z-index: 100; 
-    min-width: 280px; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
+    width: 300px; /* Set fixed width */
+    /* M3 Elevation Level 2 */
+    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15);
     transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
-    -webkit-backdrop-filter: blur(10px); 
-    backdrop-filter: blur(10px); 
+    -webkit-backdrop-filter: blur(12px); 
+    backdrop-filter: blur(12px); 
     max-height: 500px; 
     display: flex; 
     flex-direction: column; 
 }
 #debug-menu.menu-hidden {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.98) translateY(-10px); /* Adjusted for a smoother feel */
     pointer-events: none; 
 }
 #debug-menu-title {
-    background-color: rgba(55, 55, 55, 0.85); 
-    padding: 10px 15px; 
-    font-size: 14px;
-    font-weight: 600; 
-    cursor: default; 
-    border-bottom: 1px solid rgba(100, 100, 100, 0.5); 
+    background-color: var(--m3-surface-container-high);
+    padding: 8px 16px; /* Reduced vertical padding to make it shorter */
+    font-size: 16px; /* M3 Title Small */
+    font-weight: 500; 
+    cursor: grab; /* Make the entire title bar draggable */
+    border-bottom: 1px solid var(--m3-outline);
     display: flex;
     justify-content: space-between;
     align-items: center;
     user-select: none; 
-    border-top-left-radius: 7px; 
-    border-top-right-radius: 7px;
+    border-top-left-radius: calc(16px - 1px); /* Match parent border-radius */
+    border-top-right-radius: calc(16px - 1px);
     flex-shrink: 0; 
 }
 .title-text-drag-area { 
     flex-grow: 1;
-    cursor: grab; 
+    /* cursor: grab; /* Moved to #debug-menu-title */
     padding-right: 10px; 
 }
-#debug-menu.dragging .title-text-drag-area {
-    cursor: grabbing;
+#debug-menu.dragging #debug-menu-title { /* Apply grabbing cursor to the whole title bar when dragging */
+    cursor: grabbing; 
 }
 .title-buttons-wrapper {
     display: flex;
@@ -111,136 +130,174 @@ canvas {
 }
 .window-control-button {
     font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', Arial, sans-serif;
-    font-size: 10px; 
+    font-size: 18px; /* Increased icon size */
     font-weight: normal;
-    padding: 5px 7px; 
+    padding: 6px; /* Adjusted for better touch target */
     cursor: pointer;
-    color: #D0D0D0;
-    border-radius: 4px;
+    color: var(--m3-on-surface-variant);
+    border-radius: 50%; /* Circular buttons */
     line-height: 1;
     margin-left: 5px; 
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 20px; 
-    min-height: 20px;
+    min-width: 32px; /* M3 touch target consideration */
+    min-height: 32px;
+    transition: background-color 0.2s ease;
 }
 #debug-menu-collapse-btn .toggle-icon {
-    font-size: 10px; 
+    font-size: 18px; /* Match button icon size */
     transition: transform 0.2s ease-in-out;
-    color: #C0C0C0;
+    color: var(--m3-on-surface-variant);
+}
+#debug-menu-collapse-btn {
+    display: none; /* Remove the minimize/collapse button */
 }
 #debug-menu.collapsed #debug-menu-collapse-btn .toggle-icon {
     transform: rotate(-90deg);
 }
-#debug-menu-collapse-btn:hover, #pause-resume-btn:hover { 
-    background-color: rgba(200, 200, 200, 0.2); 
-    color: #ffffff;
+.window-control-button:hover {
+    background-color: rgba(var(--m3-on-surface-r, 230), var(--m3-on-surface-g, 225), var(--m3-on-surface-b, 229), var(--m3-state-hover-on-surface-opacity));
+    /* Define --m3-on-surface-r/g/b in :root if using this, or use a fixed color: */
+    /* background-color: rgba(230, 225, 229, 0.08); */
 }
 #debug-menu-close-btn:hover {
-    background-color: rgba(255, 80, 80, 0.9); 
-    color: #ffffff;
+    background-color: rgba(var(--m3-error-r, 242), var(--m3-error-g, 184), var(--m3-error-b, 181), var(--m3-state-hover-error-opacity));
+    /* background-color: rgba(242, 184, 181, 0.08); */
+    color: var(--m3-error);
 }
 .debug-menu-content {
-    padding: 15px; 
+    padding: 8px 16px 16px 16px; /* Adjusted padding */
     transition: opacity 0.3s ease, max-height 0.3s ease, padding 0.3s ease;
     opacity: 1;
-    overflow-y: auto; 
-    flex-grow: 1; 
+    overflow-y: auto;
+    flex-grow: 1;
+    font-size: 14px; /* M3 Body Medium for content */
+    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;  /* IE and Edge */
+}
+.debug-menu-content::-webkit-scrollbar {
+    display: none; /* WebKit browsers */
 }
 #debug-menu.collapsed .debug-menu-content {
     max-height: 0; 
     opacity: 0;
-    padding-top: 0;
-    padding-bottom: 0;
+    padding-top: 0 !important; /* Ensure padding collapses */
+    padding-bottom: 0 !important;
     overflow: hidden; 
 }
 .debug-menu-content div, .debug-menu-content .control-group {
     margin-bottom: 10px; 
 }
+/* Remove margin from the last child in the content area to prevent extra spacing at the bottom */
+.debug-menu-content > *:last-child {
+    margin-bottom: 0;
+}
 .debug-menu-content label {
     margin-left: 8px; 
-    vertical-align: middle;
     display: inline-block; 
     margin-bottom: 3px;
+    font-size: 12px; /* M3 Label Small */
+    color: var(--m3-on-surface-variant);
+    vertical-align: middle;
 }
  .debug-menu-content .slider-label, .debug-menu-content .color-label, .debug-menu-content .text-input-label {
     display: block; 
     margin-bottom: 4px;
+    font-size: 12px; /* M3 Label Small */
+    color: var(--m3-on-surface-variant);
 }
 .debug-menu-content input[type="checkbox"] {
     vertical-align: middle;
-    width: 16px; 
-    height: 16px;
-    accent-color: #0078D4; 
+    width: 18px; 
+    height: 18px;
+    accent-color: var(--m3-primary); 
+    border-radius: 4px; /* Slightly rounded corners */
 }
 .debug-menu-content input[type="range"] {
-    width: calc(100% - 50px); 
+    width: calc(100% - 7px); 
     margin-right: 5px;
     vertical-align: middle;
-    accent-color: #0078D4;
+    accent-color: var(--m3-primary);
+    height: 20px; /* M3 sliders are a bit thicker */
 }
 .debug-menu-content input[type="color"] {
     vertical-align: middle;
-    width: 30px;
-    height: 20px;
-    border: 1px solid rgba(100, 100, 100, 0.5);
-    border-radius: 3px;
-    padding: 1px;
+    width: 32px; /* Adjusted size */
+    height: 24px;
+    border: 1px solid var(--m3-outline);
+    border-radius: 8px; /* More rounded */
+    padding: 0; /* Remove default padding if any */
     margin-right: 5px;
+    cursor: pointer;
 }
 .debug-menu-content .slider-value {
     display: inline-block;
     width: 40px; 
     text-align: right;
     font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    color: var(--m3-on-surface-variant);
 }
 .subsection-title {
-    font-weight: 600;
-    margin-top: 15px; 
+    font-weight: 500; /* M3 Medium weight */
+    font-size: 12px; /* M3 Label Small or Overline */
+    color: var(--m3-primary); /* Use primary color for emphasis */
+    text-transform: uppercase;
+    margin-top: 20px; 
     margin-bottom: 8px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid rgba(100, 100, 100, 0.3);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--m3-outline);
 }
 .debug-menu-content > .subsection-title:first-child {
     margin-top: 0;
 }
-#lastfm-status-container { /* Remove default bottom margin for this specific container */
-    margin-bottom: 0;
-}
-#pause-resume-btn, #delete-all-shapes-btn { 
-    background-color: rgba(80, 100, 120, 0.8);
-    color: #EAEAEA;
-    border: 1px solid rgba(100,120,140,0.9);
-    padding: 6px 10px;
-    border-radius: 4px;
+#pause-resume-btn {
+    background-color: var(--m3-secondary-container);
+    color: var(--m3-on-secondary-container);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px; /* M3 Medium corner */
     cursor: pointer;
     text-align: center;
     width: 100%;
     box-sizing: border-box;
     margin-top: 5px; 
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
 }
-#fetch-lastfm-btn { /* Style for the new Last.fm fetch button */
-    background-color: rgba(70, 90, 110, 0.8); /* Slightly different color */
-    color: #EAEAEA;
-    border: 1px solid rgba(90,110,130,0.9);
-    padding: 6px 10px;
-    border-radius: 4px;
+#fetch-lastfm-btn, #delete-all-shapes-btn { /* Group fetch and delete for common properties initially */
+    background-color: var(--m3-secondary-container);
+    color: var(--m3-on-secondary-container);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
     cursor: pointer;
     text-align: center;
     width: 100%;
     box-sizing: border-box;
-    margin-top: 0; /* Remove space above the button */
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
 }
- #pause-resume-btn:hover { 
-    background-color: rgba(100, 120, 140, 0.9);
+#fetch-lastfm-btn {
+    margin-top: 0; /* Specific margin for fetch button, ensures no space below status container */
+    /* Reverted: Height and flex centering removed to restore original button size */
 }
-#delete-all-shapes-btn:hover { 
-    background-color: rgba(150, 70, 70, 0.9); 
-    border-color: rgba(255, 100, 100, 0.9); /* Light red border on hover */
+#delete-all-shapes-btn {
+    margin-top: 5px; /* Specific margin for delete button */
+    background-color: var(--m3-error-container); /* Destructive action base color */
+    color: var(--m3-on-error-container);       /* Destructive action text color */
 }
-#fetch-lastfm-btn:hover {
-    background-color: rgba(90, 110, 130, 0.9);
+
+#pause-resume-btn:hover, #fetch-lastfm-btn:hover {
+    background-color: color-mix(in srgb, var(--m3-on-secondary-container) calc(var(--m3-state-hover-on-secondary-container-opacity) * 100%), var(--m3-secondary-container));
+}
+
+#delete-all-shapes-btn:hover {
+    background-color: color-mix(in srgb, var(--m3-on-error-container) calc(var(--m3-state-hover-error-opacity) * 100%), var(--m3-error-container));
+    /* The color var(--m3-on-error-container) is inherited from the base style */
 }
 .color-input-group {
     display: flex;
@@ -273,20 +330,22 @@ canvas {
     font-size: 0.9em; /* Match artist font size */
     color: #B0B0B0; /* Match artist color */
     line-height: 1.2; /* Consistent line height */
-    margin-bottom: 2px;/* Small space between artist and album */
+    margin-bottom: 0;  /* Remove bottom margin for the last item for better centering in parent */
 }
 #lastfm-album-art { /* Ensure consistent styling if not already fully inline */
     border-radius: 4px; /* Already inline, but good to have in CSS if other styles are added */
-    vertical-align: middle; /* Helps ensure consistent alignment of the image */
+    /* vertical-align: middle; Removed as it's not effective for flex items; parent flex properties handle alignment */
 }
 #lastfm-status-container {
-    margin-bottom: 0;
-    min-height: 50px; /* Set to album art height to maintain space */
-    display: flex;    /* Helps in centering content like loading/error messages */
-    align-items: center; /* Vertically center the active child (nowplaying, loading, etc.) */
+    margin-top: 0;    /* Ensure no vertical space above this container from its own margin */
+    margin-bottom: 0; /* Ensure no vertical space below this container */
+    height: 75px;     /* Set fixed height for the song info group */
+    display: flex;    /* Use flex to align its children (e.g., #lastfm-nowplaying) */
+    align-items: center;/* Vertically center the content within the 75px height */
 }
 #lastfm-loading, #lastfm-error, #lastfm-notplaying { /* #lastfm-nowplaying has its own style now */
     width: 100%; /* Ensure the active content takes full width */
+    text-align: center; /* Horizontally center the text content */
 }
 #lastfm-nowplaying { /* Moved from inline style */
     display: flex;

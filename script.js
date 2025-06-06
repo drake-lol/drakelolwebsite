@@ -15,8 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const debugMenu = document.getElementById('debug-menu');
     const debugMenuTitle = document.getElementById('debug-menu-title');
     const debugMenuCloseBtn = document.getElementById('debug-menu-close-btn');
-    const debugMenuCollapseBtn = document.getElementById('debug-menu-collapse-btn');
-    const titleTextDragArea = debugMenuTitle.querySelector('.title-text-drag-area');
+    const debugMenuCollapseBtn = document.getElementById('debug-menu-collapse-btn');    
     const pauseResumeBtn = document.getElementById('pause-resume-btn');
     const deleteAllShapesBtn = document.getElementById('delete-all-shapes-btn'); 
     const colorPaletteControlsContainer = document.getElementById('color-palette-controls');
@@ -326,6 +325,149 @@ document.addEventListener('DOMContentLoaded', () => {
         return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
     }
     // --- Initialize UI ---
+    
+    // Helper to convert RGB object to array for areColorsSimilar
+    const rgbToArr = (rgbObj) => {
+        return rgbObj ? [rgbObj.r, rgbObj.g, rgbObj.b] : [0,0,0];
+    };
+
+    // --- Material You Dynamic Theme Color Helpers ---
+    function lightenDarkenColor(hex, percent) {
+        let { r, g, b } = hexToRgb(hex);
+        const amount = Math.floor(255 * (percent / 100));
+        r = Math.max(0, Math.min(255, r + amount));
+        g = Math.max(0, Math.min(255, g + amount));
+        b = Math.max(0, Math.min(255, b + amount));
+        return rgbToHex(r, g, b);
+    }
+
+    function getWCAGContrastRatio(hex1, hex2) {
+        const lum1 = getLuminance(hex1);
+        const lum2 = getLuminance(hex2);
+        const lighter = Math.max(lum1, lum2);
+        const darker = Math.min(lum1, lum2);
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    function getContrastColor(hex) {
+        const luminance = getLuminance(hex);
+        // Original threshold of 0.5 was too high, causing light buttons (e.g., HSL L=0.6-0.7)
+        // to get light text, resulting in poor contrast on the button itself.
+        // A lower threshold (e.g., 0.22) better distinguishes between colors needing
+        // light text versus dark text. Primary accent colors are designed to be light
+        // (luminance typically > 0.22), so they should receive dark text.
+        return luminance > 0.22 ? '#202124' : '#E8EAED'; // Darker black and lighter white for better general contrast
+    }
+
+    function getSlightlyLessContrastColor(surfaceHexColor) {
+        const surfaceLuminance = getLuminance(surfaceHexColor);
+        // M3 typical "on surface variant" colors
+        return surfaceLuminance > 0.5 ? '#49454F' : '#CAC4D0'; 
+    }
+
+    function updateDynamicM3ThemeColors(bgColor, accentPalette) {
+        const rootStyle = document.documentElement.style;
+        if (!bgColor || !accentPalette) return;
+
+        const MIN_SATURATION_FOR_ACCENT = 0.15;
+        const MIN_CONTRAST_PRIMARY_ON_SURFACE = 3.0; // For primary accent on the dark menu surface
+
+        // --- Surface colors: Ensure they are "much darker" ---
+        const bgHsl = hexToHSL(bgColor);
+        let surfaceHsl = { ...bgHsl };
+
+        // Force a dark theme for the M3 variables that would typically be used by a menu/debug UI
+        surfaceHsl.l = 0.12; // Target a dark lightness (e.g., ~12%)
+        // Adjust surface color saturation: aim for ~half of the previous boost, still > original.
+        surfaceHsl.s = Math.min(Math.max(bgHsl.s * 0.35, 0.10), 0.23); // Saturation (min 10%, cap 23%)
+        const surface = hslToHex(surfaceHsl.h, surfaceHsl.s, surfaceHsl.l);
+
+        let surfaceContainerHighHsl = { ...surfaceHsl };
+        surfaceContainerHighHsl.l = Math.min(0.95, surfaceHsl.l + 0.06); // e.g., 0.12 -> 0.18 (ensure not >1)
+        const surfaceContainerHigh = hslToHex(surfaceContainerHighHsl.h, surfaceContainerHighHsl.s, surfaceContainerHighHsl.l);
+        
+        // Ensure onSurface (title text, etc.) is always light and legible for the dark menu
+        const onSurface = '#E8EAED'; // A light, high-contrast color
+        const onSurfaceVariant = '#CAC4D0'; // A slightly dimmer light color for secondary text
+
+        let outlineHsl = { ...surfaceHsl };
+        outlineHsl.l = Math.min(0.95, surfaceHsl.l + 0.08); // Slightly more distinct outline
+        const outline = hslToHex(outlineHsl.h, outlineHsl.s, outlineHsl.l);
+
+        // --- Primary Accent (adjusted to be light, for use on dark surfaces like the menu) ---
+        let primaryAccent = null;
+        if (accentPalette.length > 0) {
+            const potentialPrimaries = accentPalette
+                .map(hex => ({
+                    hex,
+                    contrast: getWCAGContrastRatio(hex, surface), // Check contrast against the dark surface
+                    hsl: hexToHSL(hex)
+                }))
+                // Filter for light accents with good contrast on dark surface and decent saturation
+                .filter(p => p.contrast >= MIN_CONTRAST_PRIMARY_ON_SURFACE && p.hsl.l >= 0.60 && p.hsl.s >= MIN_SATURATION_FOR_ACCENT)
+                .sort((a, b) => b.hsl.s - a.hsl.s || b.contrast - a.contrast); // Prioritize saturation, then contrast
+
+            if (potentialPrimaries.length > 0) {
+                primaryAccent = potentialPrimaries[0].hex;
+            }
+        }
+
+        // Derive a light primary accent if not found from palette
+        if (!primaryAccent) {
+            let paHsl = hexToHSL(bgColor); // Start with main background's HSL for hue
+            paHsl.h = (paHsl.h + 40) % 360; // Hue shift for accent
+            paHsl.s = Math.min(1, Math.max(0.45, paHsl.s + 0.1)); // Ensure good saturation (min 0.45)
+            paHsl.l = 0.70; // Make it a light color (e.g., 70% lightness)
+            primaryAccent = hslToHex(paHsl.h, paHsl.s, paHsl.l);
+
+            // Ensure contrast with the dark surface
+            if (getWCAGContrastRatio(primaryAccent, surface) < MIN_CONTRAST_PRIMARY_ON_SURFACE) {
+                paHsl.l = 0.75; // Try even lighter
+                primaryAccent = hslToHex(paHsl.h, paHsl.s, paHsl.l);
+                 if (getWCAGContrastRatio(primaryAccent, surface) < MIN_CONTRAST_PRIMARY_ON_SURFACE) {
+                    primaryAccent = '#89b3ff'; // A fallback light blue accent, legible on dark surfaces
+                 }
+            }
+        }
+        const onPrimary = getContrastColor(primaryAccent);
+
+        // --- Secondary Container ---
+        let secondaryContainer = null;
+        if (accentPalette.length > 0) {
+            const potentialSecondaries = accentPalette
+                .filter(hex => hex.toUpperCase() !== primaryAccent.toUpperCase()) // Different from primary
+                .map(hex => ({ hex, hsl: hexToHSL(hex) }))
+                .sort((a,b) => b.hsl.s - a.hsl.s); // Pick another saturated one if available
+            if (potentialSecondaries.length > 0) {
+                let secondaryHex = potentialSecondaries[0].hex;
+                let secondaryHsl = hexToHSL(secondaryHex);
+                // Reduce saturation to make it less vibrant, M3 tonal colors are often less saturated
+                secondaryHsl.s = Math.min(secondaryHsl.s, 0.4); // Cap saturation (e.g., 40%)
+                secondaryContainer = hslToHex(secondaryHsl.h, secondaryHsl.s, secondaryHsl.l);
+            }
+        }
+
+        if (!secondaryContainer) {
+            // Derive tonal secondary container from the new dark 'surface' color
+            // Since surface is dark, getLuminance(surface) will be low, so this adds 12% lightness.
+            secondaryContainer = lightenDarkenColor(surface, getLuminance(surface) > 0.5 ? -10 : 12);
+            if (areColorsSimilar(rgbToArr(hexToRgb(secondaryContainer)), rgbToArr(hexToRgb(primaryAccent)), 25)) {
+                secondaryContainer = lightenDarkenColor(surface, 18); // More distinct tonal from surface
+            }
+        }
+        const onSecondaryContainer = getContrastColor(secondaryContainer);
+
+        // Set CSS properties
+        rootStyle.setProperty('--m3-primary', primaryAccent);
+        rootStyle.setProperty('--m3-on-primary', onPrimary);
+        rootStyle.setProperty('--m3-secondary-container', secondaryContainer);
+        rootStyle.setProperty('--m3-on-secondary-container', onSecondaryContainer);
+        rootStyle.setProperty('--m3-surface', surface);
+        rootStyle.setProperty('--m3-surface-container-high', surfaceContainerHigh);
+        rootStyle.setProperty('--m3-on-surface', onSurface);
+        rootStyle.setProperty('--m3-on-surface-variant', onSurfaceVariant);
+        rootStyle.setProperty('--m3-outline', outline);
+    }
     // UI elements like color pickers and sliders will be fully initialized
     // by performInitialSceneSetupIfNeeded based on Last.fm data or defaults.
     function initializeColorPaletteUI() { 
@@ -366,6 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (colorIndex < colorPalette.length && colorPalette[colorIndex]?.toUpperCase() !== newHexColor) {
                     scheduleOldColorCleanup(); // Schedule cleanup before changing the palette
                     colorPalette[colorIndex] = newHexColor; // Update the master palette
+                    updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
                 }
             });
             group.appendChild(label);
@@ -564,6 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
         targetBackgroundColor = e.target.value;
         backgroundColorTransitionStartTime = performance.now();
         isBackgroundTransitioning = true;
+        updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
         spawnTransitionShapes(); // Spawn transition shapes
         // The animation loop will call applyBlurEffect
     });
@@ -636,10 +780,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Menu Interaction Logic ---
-    if (debugMenuTitle && debugMenu && debugMenuCloseBtn && debugMenuCollapseBtn && titleTextDragArea) {
-        titleTextDragArea.addEventListener('mousedown', (e) => {
-            e.preventDefault(); isDragging = true; debugMenu.classList.add('dragging'); 
-            dragStartX = e.clientX; dragStartY = e.clientY;
+    if (debugMenuTitle && debugMenu && debugMenuCloseBtn && debugMenuCollapseBtn) {
+        debugMenuTitle.addEventListener('mousedown', (e) => {
+            // Prevent dragging if the click is on a button within the title bar
+            if (e.target.closest('.window-control-button') || e.target.closest('.title-buttons-wrapper')) {
+                return;
+            }
+            e.preventDefault(); 
+            isDragging = true; debugMenu.classList.add('dragging'); 
+            dragStartX = e.clientX; dragStartY = e.clientY; // Corrected: Use e.clientX/Y
             menuInitialX = debugMenu.offsetLeft; menuInitialY = debugMenu.offsetTop;
             document.addEventListener('mousemove', onDrag);
             document.addEventListener('mouseup', onDragEnd);
@@ -1344,6 +1493,7 @@ function applyDefaultColors() {
     colorPalette = defaultColorPalette.length > 0 ? [...defaultColorPalette.map(c => c.toUpperCase())] : [];
     // If applying default colors, the UI palette should also reflect this.
     initializeColorPaletteUI(false); // Update UI pickers to show default palette (or random if defaults not loaded)
+    updateDynamicM3ThemeColors(defaultBackgroundColor, defaultColorPalette);
 }
 
 function arePalettesRoughlyEqual(paletteA, paletteB) {
@@ -1404,6 +1554,7 @@ function performInitialSceneSetupIfNeeded() {
         console.log(`Performing initial scene setup with ${setupType} colors.`);
         if (backgroundColorPicker) backgroundColorPicker.value = targetBackgroundColor;
         updateBackgroundOverlayState(targetBackgroundColor); // Set initial overlay state
+        updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette); // Set M3 theme
         initializeColorPaletteUI(); // Update UI based on the now populated colorPalette
         adjustShapesArray(); // Spawn shapes
         initialSceneSetupPerformed = true; // Mark that initial setup is done
@@ -1477,6 +1628,7 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
             } else {
                 firstLastFmColorChangeDone = true; // Mark that the first color change has happened
             }
+            updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
             initializeColorPaletteUI(); // Update palette UI with new colors
 
             // applyBlurEffect will be handled by the animation loop for smooth transition
