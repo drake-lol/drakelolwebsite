@@ -1382,9 +1382,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const fps = Math.round((frameCountForFPS * 1000) / timeSinceLastFPSUpdate);
             if (fpsDisplay) fpsDisplay.textContent = fps;
             if (onScreenShapeCountDisplay) {
-                let displayText = currentOnScreenShapes.toString();
+                let displayText = `${currentOnScreenShapes}`;
                 if (fadingOutShapesData.length > 0) {
-                    displayText += ` (${fadingOutShapesData.length})`;
+                    displayText += ` (${fadingOutShapesData.length} fading out)`;
                 }
                 onScreenShapeCountDisplay.textContent = displayText;
             }
