@@ -320,6 +320,7 @@ canvas {
     min-width: 0;     /* Important for flex items: allows shrinking below content size */
     overflow: hidden; /* Clip overflowing content, helps child ellipsis to trigger */
     max-width: 200px; /* Constrain the width of the text details block */
+    transform: translateY(0px); /* Shift text details up by 10px */
 }
 #lastfm-track {
     font-weight: bold; 
@@ -342,25 +343,41 @@ canvas {
     font-size: 0.9em; /* Match artist font size */
     color: #B0B0B0; /* Match artist color */
     line-height: 1.2; /* Consistent line height */
-    margin-bottom: 0;  /* Remove bottom margin for the last item for better centering in parent */
+    margin-bottom: 2px;  /* Add consistent margin before the BPM line */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* #lastfm-bpm styles removed as the element is removed */
+
 #lastfm-album-art { /* Ensure consistent styling if not already fully inline */
-    border-radius: 4px; /* Already inline, but good to have in CSS if other styles are added */
+    border-radius: 4px; /* Was inline, good to keep in CSS if other styles are added */
     /* vertical-align: middle; Removed as it's not effective for flex items; parent flex properties handle alignment */
+    /* width: 50px; height: 50px; are inline styles, controlled by JS if needed */
+    /* display: none; is an inline style, controlled by JS */
+}
+
+/* New wrapper for album art and BPM text, to stack them vertically */
+.album-art-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* Aligns BPM text to the left, matching album art */
+    margin-right: 10px; /* Reduced margin to bring text details 5px closer */
 }
 #lastfm-status-container {
     margin-top: 0;    /* Ensure no vertical space above this container from its own margin */
-    margin-bottom: 0; /* Ensure no vertical space below this container */
-    height: 75px;     /* Set fixed height for the song info group */
-    display: flex;    /* Use flex to align its children (e.g., #lastfm-nowplaying) */
-    align-items: center;/* Vertically center the content within the 75px height */
+    margin-bottom: -9px; /* Ensure no vertical space below this container */
+    height: 75px;     /* Restore fixed height as requested */
+    padding-top: 7px; /* Add padding to push content down */
+    display: flex;    /* Use flex to align its children */
+    align-items: center;/* Vertically center content (song details) within this container */
 }
 #lastfm-loading, #lastfm-error, #lastfm-notplaying { /* #lastfm-nowplaying has its own style now */
     width: 100%; /* Ensure the active content takes full width */
     text-align: center; /* Horizontally center the text content */
+}
+#lastfm-loading { /* Specific adjustment for loading text position */
+    transform: translateY(-10px);
 }
 #lastfm-nowplaying { /* Moved from inline style */
     display: flex;

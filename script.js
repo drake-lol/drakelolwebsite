@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastfmTrackDiv = document.getElementById('lastfm-track');
     const lastfmArtistDiv = document.getElementById('lastfm-artist');
     const lastfmAlbumDiv = document.getElementById('lastfm-album');
+    const lastfmBpmDiv = document.getElementById('lastfm-bpm'); // BPM display element
     const fetchLastFmBtn = document.getElementById('fetch-lastfm-btn');
 
     const cornerImage = document.querySelector('.corner-image');
@@ -106,7 +107,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const LASTFM_API_URL = 'https://lastfm-red-surf-3b97.damp-unit-21f3.workers.dev/';
     const LASTFM_POLL_INTERVAL = 15000; // 15 seconds
+    // --- Placeholder for Alternative BPM API ---
+    const AUDIO_DB_API_URL_BASE = 'https://theaudiodb-api-cool-shape-691.damp-unit-21f3.workers.dev/'; // Your new worker URL
     let lastfmPollIntervalId = null;
+    // State for tracking BPM fetching to avoid redundant calls
+    let lastQueriedArtistForBpm = '';
+    let lastQueriedTrackForBpm = '';
+    let lastBpmDisplayValue = ''; // Stores the string like "BPM: 120", "BPM: N/A", or "BPM: Fetching..."
+
     let currentAlbumArtUrl = ''; // Store the current album art URL to detect changes
     const colorThief = new ColorThief(); // Instantiate ColorThief
     let initialSceneSetupPerformed = false;
@@ -1429,81 +1437,201 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Last.fm Integration Functions (moved inside DOMContentLoaded) ---
-    function updateLastFmUI(data) {
-    lastfmLoadingDiv.style.display = 'none';
-    lastfmErrorDiv.style.display = 'none';
-    let useDefaultColors = false; // Flag to decide if default colors should be applied
-    if (fetchLastFmBtn) fetchLastFmBtn.disabled = false; // Re-enable button
-    if (!data || !data.recenttracks || !data.recenttracks.track || data.recenttracks.track.length === 0) {
-        lastfmNowPlayingDiv.style.display = 'none';
-        lastfmNotPlayingDiv.style.display = 'block';
-        lastfmNotPlayingDiv.textContent = 'No recent tracks found.';
-        // Explicitly reset content of hidden "now playing" elements
-        lastfmTrackDiv.textContent = '-';
-        lastfmArtistDiv.textContent = '-';
-        lastfmAlbumDiv.textContent = '-';
-        lastfmAlbumArtImg.src = '';
-        lastfmAlbumArtImg.style.display = 'none';
-        handleOldMenuLastFmUpdate(data); // Update old menu based on this state
-        useDefaultColors = true; // Use default colors if no recent tracks
-        return;
-    }
-
-    const track = data.recenttracks.track[0];
-    if (track && track['@attr'] && track['@attr'].nowplaying === 'true') {
-        lastfmNowPlayingDiv.style.display = 'flex';
-        lastfmNotPlayingDiv.style.display = 'none';
-        lastfmTrackDiv.textContent = track.name || 'Unknown Track';
-        lastfmArtistDiv.textContent = track.artist['#text'] || 'Unknown Artist';
-        lastfmAlbumDiv.textContent = track.album['#text'] || 'Unknown Album';
-        
-        const imageUrl = track.image.find(img => img.size === 'extralarge')['#text'] || // Prefer largest for better color analysis
-                         track.image.find(img => img.size === 'large')['#text'] ||
-                         track.image.find(img => img.size === 'medium')['#text'] || '';
-
-        if (imageUrl) {
-            if (imageUrl !== currentAlbumArtUrl) {
-                lastfmAlbumArtImg.src = imageUrl; // Set src to trigger load
-                lastfmAlbumArtImg.style.display = 'block'; // Show image
-                currentAlbumArtUrl = imageUrl;
-                extractAndApplyColorsFromAlbumArt(imageUrl);
-            } else {
-                 // Album art is the same, no need to re-extract colors,
-                 // but ensure UI is correct and colors are applied if needed (e.g., after manual fetch)
-                 lastfmAlbumArtImg.style.display = 'block';
-                 // Colors are already set from this art, no action needed here.
-            }
-        } else {
-            lastfmAlbumArtImg.style.display = 'none';
-            // No album art for the currently playing track
-            useDefaultColors = true;
-            // If currentAlbumArtUrl was previously set, clear it
-            lastFmColorsExtractedSuccessfully = false; // No Last.fm art colors
-            if (currentAlbumArtUrl !== '') { currentAlbumArtUrl = ''; } // Reset if art disappears
+    async function fetchBpmFromAudioDB(artistToFetch, trackTitleToFetch) {
+        // If the UI has already changed to a different song by the time this async function's core logic starts,
+        // it's best to not proceed with this specific fetch, as a new one will be triggered for the new song.
+        if (lastfmTrackDiv.textContent !== trackTitleToFetch || lastfmArtistDiv.textContent !== artistToFetch) {
+            // console.log(`BPM fetch for ${artistToFetch} - ${trackTitleToFetch} aborted as UI already displays a different song.`);
+            return;
         }
-    } else {
-        lastfmNowPlayingDiv.style.display = 'none';
-        lastfmAlbumArtImg.style.display = 'none';
-        lastfmNotPlayingDiv.style.display = 'block';
-        lastfmNotPlayingDiv.textContent = 'Not currently playing.';
-        // Explicitly reset content of hidden "now playing" elements
-        lastfmTrackDiv.textContent = '-';
-        lastfmArtistDiv.textContent = '-';
-        lastfmAlbumDiv.textContent = '-';
-        lastfmAlbumArtImg.src = '';
-        useDefaultColors = true; // Use default colors if not playing
-        lastFmColorsExtractedSuccessfully = false; // No Last.fm art colors
-        if (currentAlbumArtUrl !== '') { currentAlbumArtUrl = ''; } // Reset if art disappears
+        // Note: The "Fetching..." message is set by updateLastFmUI before calling this.
+
+        try {
+            // Sanitize artist and track names: remove non-alphanumeric characters
+            const sanitizedArtist = artistToFetch.replace(/[^a-zA-Z0-9]/g, '');
+            const sanitizedTrack = trackTitleToFetch.replace(/[^a-zA-Z0-9]/g, '');
+
+            // Construct query parameters for TheAudioDB worker: ?s=artist&t=track
+            const queryParams = new URLSearchParams({
+                s: sanitizedArtist,
+                t: sanitizedTrack
+            });
+            const response = await fetch(`${AUDIO_DB_API_URL_BASE}?${queryParams.toString()}`);
+
+            if (!response.ok) {
+                let errorDetails = `status: ${response.status}, statusText: ${response.statusText}`;
+                try {
+                    // Try to get text first, as JSON parsing might fail for non-JSON 500 responses
+                    const textBody = await response.text(); // Consume the body
+                    errorDetails += `, body: ${textBody}`;
+                } catch (e) {
+                    errorDetails += ` (could not read error response body: ${e.message})`;
+                }
+                throw new Error(`TheAudioDB API error! ${errorDetails}`);
+            }
+
+            const responseText = await response.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error("Error parsing JSON from TheAudioDB:", parseError, "Raw response text:", responseText);
+                throw new Error(`TheAudioDB API response was not valid JSON. Raw text: ${responseText.substring(0, 100)}...`);
+            }
+            // console.log("AudioDB Response:", data); // Uncomment to inspect
+
+            let foundBpm = null;
+            let resultBpmText;
+            // TheAudioDB usually returns track details in an array, often `track` or `tracks`.
+            // The BPM is typically in `intTrackBPM`.
+            if (data.track && data.track.length > 0 && data.track[0].intTrackBPM) {
+                foundBpm = parseInt(data.track[0].intTrackBPM, 10);
+            } else if (data.tracks && data.tracks.length > 0 && data.tracks[0].intTrackBPM) { // Alternative common structure
+                foundBpm = parseInt(data.tracks[0].intTrackBPM, 10);
+            }
+
+            if (foundBpm && !isNaN(foundBpm) && foundBpm > 0) { // BPM should be a positive number
+                resultBpmText = `BPM: ${foundBpm}`;
+            } else {
+                resultBpmText = 'BPM: N/A';
+            }
+
+            // Update global BPM state IF this fetch was for the song that is currently marked as "being queried for BPM"
+            if (artistToFetch === lastQueriedArtistForBpm && trackTitleToFetch === lastQueriedTrackForBpm) {
+                lastBpmDisplayValue = resultBpmText;
+            }
+
+            // Update UI IF the song currently displayed in the UI is the one this fetch was for.
+            // This handles race conditions where the UI might have changed again *during* the await fetch().
+            if (lastfmTrackDiv.textContent === trackTitleToFetch && lastfmArtistDiv.textContent === artistToFetch) {
+                lastfmBpmDiv.textContent = resultBpmText;
+            }
+
+        } catch (error) {
+            console.error('Error fetching BPM from TheAudioDB:', error);
+            const errorBpmText = 'BPM: N/A';
+            if (artistToFetch === lastQueriedArtistForBpm && trackTitleToFetch === lastQueriedTrackForBpm) {
+                lastBpmDisplayValue = errorBpmText;
+            }
+            if (lastfmTrackDiv.textContent === trackTitleToFetch && lastfmArtistDiv.textContent === artistToFetch) {
+                lastfmBpmDiv.textContent = errorBpmText;
+            }
+        }
     }
 
-    // Apply default colors if the flag is set
-    if (useDefaultColors) {
-        applyDefaultColors();
-        lastFmColorsExtractedSuccessfully = false; // Mark that Last.fm colors were NOT used
-        performInitialSceneSetupIfNeeded(); // Re-evaluate initial setup state
+    function updateLastFmUI(data) {
+        lastfmLoadingDiv.style.display = 'none';
+        lastfmErrorDiv.style.display = 'none';
+        let useDefaultColors = false; // Flag to decide if default colors should be applied
+        if (fetchLastFmBtn) fetchLastFmBtn.disabled = false; // Re-enable button
+
+        if (!data || !data.recenttracks || !data.recenttracks.track || data.recenttracks.track.length === 0) {
+            lastfmNowPlayingDiv.style.display = 'none';
+            lastfmNotPlayingDiv.style.display = 'block';
+            lastfmNotPlayingDiv.textContent = 'No recent tracks found.';
+            lastfmTrackDiv.textContent = '-';
+            lastfmArtistDiv.textContent = '-';
+            lastfmAlbumDiv.textContent = '-';
+            if (lastfmBpmDiv) {
+                lastfmBpmDiv.textContent = '-';
+                lastfmBpmDiv.style.display = 'none';
+            }
+            lastQueriedArtistForBpm = ''; // Reset BPM tracking state
+            lastQueriedTrackForBpm = '';
+            lastBpmDisplayValue = '';
+            lastfmAlbumArtImg.src = '';
+            lastfmAlbumArtImg.style.display = 'none';
+            handleOldMenuLastFmUpdate(data);
+            useDefaultColors = true;
+            return;
+        }
+
+        const track = data.recenttracks.track[0];
+        if (track && track['@attr'] && track['@attr'].nowplaying === 'true') {
+            lastfmNowPlayingDiv.style.display = 'flex';
+            lastfmNotPlayingDiv.style.display = 'none';
+
+            const currentTrackName = track.name || 'Unknown Track';
+            const currentArtistName = track.artist['#text'] || 'Unknown Artist';
+
+            lastfmTrackDiv.textContent = currentTrackName;
+            lastfmArtistDiv.textContent = currentArtistName;
+            lastfmAlbumDiv.textContent = track.album['#text'] || 'Unknown Album';
+
+            if (lastfmBpmDiv) {
+                if (track.bpm && track.bpm !== "0") { // BPM available directly from Last.fm
+                    lastBpmDisplayValue = `BPM: ${track.bpm}`;
+                    lastfmBpmDiv.textContent = lastBpmDisplayValue;
+                    lastfmBpmDiv.style.display = 'block';
+                    // Update our knowledge of this song's BPM status
+                    lastQueriedArtistForBpm = currentArtistName;
+                    lastQueriedTrackForBpm = currentTrackName;
+                } else {
+                    // BPM not available from Last.fm, decide whether to fetch from TheAudioDB
+                    if (currentArtistName !== lastQueriedArtistForBpm || currentTrackName !== lastQueriedTrackForBpm) {
+                        // This is a new song, or we haven't queried for this specific song before.
+                        lastQueriedArtistForBpm = currentArtistName;
+                        lastQueriedTrackForBpm = currentTrackName;
+                        lastBpmDisplayValue = 'BPM: Fetching...'; // Set initial state for this new query
+                        lastfmBpmDiv.textContent = lastBpmDisplayValue;
+                        lastfmBpmDiv.style.display = 'block';
+                        fetchBpmFromAudioDB(currentArtistName, currentTrackName);
+                    } else {
+                        // Same song as the last query, display the stored/previous result for it.
+                        // lastBpmDisplayValue could be "Fetching...", "N/A", or an actual BPM.
+                        lastfmBpmDiv.textContent = lastBpmDisplayValue;
+                        lastfmBpmDiv.style.display = 'block';
+                    }
+                }
+            }
+            
+            const imageUrl = track.image.find(img => img.size === 'extralarge')['#text'] ||
+                             track.image.find(img => img.size === 'large')['#text'] ||
+                             track.image.find(img => img.size === 'medium')['#text'] || '';
+
+            if (imageUrl) {
+                if (imageUrl !== currentAlbumArtUrl) {
+                    lastfmAlbumArtImg.src = imageUrl;
+                    lastfmAlbumArtImg.style.display = 'block';
+                    currentAlbumArtUrl = imageUrl;
+                    extractAndApplyColorsFromAlbumArt(imageUrl);
+                } else {
+                    lastfmAlbumArtImg.style.display = 'block';
+                }
+            } else {
+                lastfmAlbumArtImg.style.display = 'none';
+                useDefaultColors = true;
+                lastFmColorsExtractedSuccessfully = false;
+                if (currentAlbumArtUrl !== '') { currentAlbumArtUrl = ''; }
+            }
+        } else { // Not currently playing
+            lastfmNowPlayingDiv.style.display = 'none';
+            lastfmAlbumArtImg.style.display = 'none';
+            lastfmNotPlayingDiv.style.display = 'block';
+            lastfmNotPlayingDiv.textContent = 'Not currently playing.';
+            lastfmTrackDiv.textContent = '-';
+            lastfmArtistDiv.textContent = '-';
+            lastfmAlbumDiv.textContent = '-';
+            if (lastfmBpmDiv) {
+                lastfmBpmDiv.textContent = '-';
+                lastfmBpmDiv.style.display = 'none';
+            }
+            lastQueriedArtistForBpm = ''; // Reset BPM tracking state
+            lastQueriedTrackForBpm = '';
+            lastBpmDisplayValue = '';
+            lastfmAlbumArtImg.src = '';
+            useDefaultColors = true;
+            lastFmColorsExtractedSuccessfully = false;
+            if (currentAlbumArtUrl !== '') { currentAlbumArtUrl = ''; }
+        }
+
+        if (useDefaultColors) {
+            applyDefaultColors();
+            lastFmColorsExtractedSuccessfully = false;
+            performInitialSceneSetupIfNeeded();
+        }
+        handleOldMenuLastFmUpdate(data);
     }
-    handleOldMenuLastFmUpdate(data); // Update old menu based on current Last.fm data
-}
 
 async function fetchLastFmData(isManualFetch = false) {
     lastfmLoadingDiv.style.display = 'block';
