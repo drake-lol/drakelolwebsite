@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const debugMenuTitle = document.getElementById('debug-menu-title');
     const debugMenuCloseBtn = document.getElementById('debug-menu-close-btn');
     const debugMenuCollapseBtn = document.getElementById('debug-menu-collapse-btn');    
+    const debugMenuContent = debugMenu ? debugMenu.querySelector('.debug-menu-content') : null;
     const pauseResumeBtn = document.getElementById('pause-resume-btn');
     const deleteAllShapesBtn = document.getElementById('delete-all-shapes-btn'); 
     const colorPaletteControlsContainer = document.getElementById('color-palette-controls');
@@ -371,19 +372,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const MIN_SATURATION_FOR_ACCENT = 0.15;
         const MIN_CONTRAST_PRIMARY_ON_SURFACE = 3.0; // For primary accent on the dark menu surface
+        const MIN_TARGET_LUMINANCE_FOR_PRIMARY_ACCENT = 0.25; // Minimum perceptual brightness for the button color
 
         // --- Surface colors: Ensure they are "much darker" ---
         const bgHsl = hexToHSL(bgColor);
+        const isBaseGrayScale = bgHsl.s < 0.05; // Threshold for considering the base color grayscale
+
         let surfaceHsl = { ...bgHsl };
 
         // Force a dark theme for the M3 variables that would typically be used by a menu/debug UI
         surfaceHsl.l = 0.12; // Target a dark lightness (e.g., ~12%)
-        // Adjust surface color saturation: aim for ~half of the previous boost, still > original.
-        surfaceHsl.s = Math.min(Math.max(bgHsl.s * 0.35, 0.10), 0.23); // Saturation (min 10%, cap 23%)
+        if (isBaseGrayScale) {
+            surfaceHsl.s = 0; // Grayscale surface if base is grayscale
+        } else {
+            // Adjust surface color saturation: aim for ~half of the previous boost, still > original.
+            surfaceHsl.s = Math.min(Math.max(bgHsl.s * 0.35, 0.10), 0.23); // Saturation (min 10%, cap 23%)
+        }
         const surface = hslToHex(surfaceHsl.h, surfaceHsl.s, surfaceHsl.l);
 
         let surfaceContainerHighHsl = { ...surfaceHsl };
         surfaceContainerHighHsl.l = Math.min(0.95, surfaceHsl.l + 0.06); // e.g., 0.12 -> 0.18 (ensure not >1)
+        // surfaceContainerHighHsl.s will be same as surfaceHsl.s (0 if grayscale)
         const surfaceContainerHigh = hslToHex(surfaceContainerHighHsl.h, surfaceContainerHighHsl.s, surfaceContainerHighHsl.l);
         
         // Ensure onSurface (title text, etc.) is always light and legible for the dark menu
@@ -393,6 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let outlineHsl = { ...surfaceHsl };
         outlineHsl.l = Math.min(0.95, surfaceHsl.l + 0.08); // Slightly more distinct outline
         const outline = hslToHex(outlineHsl.h, outlineHsl.s, outlineHsl.l);
+        // outlineHsl.s will be same as surfaceHsl.s (0 if grayscale)
 
         // --- Primary Accent (adjusted to be light, for use on dark surfaces like the menu) ---
         let primaryAccent = null;
@@ -404,31 +414,78 @@ document.addEventListener('DOMContentLoaded', () => {
                     hsl: hexToHSL(hex)
                 }))
                 // Filter for light accents with good contrast on dark surface and decent saturation
-                .filter(p => p.contrast >= MIN_CONTRAST_PRIMARY_ON_SURFACE && p.hsl.l >= 0.60 && p.hsl.s >= MIN_SATURATION_FOR_ACCENT)
-                .sort((a, b) => b.hsl.s - a.hsl.s || b.contrast - a.contrast); // Prioritize saturation, then contrast
+                .filter(p => {
+                    const meetsContrastAndLightness = p.contrast >= MIN_CONTRAST_PRIMARY_ON_SURFACE && p.hsl.l >= 0.50; // Prefer accents with at least 50% HSL lightness
+                    if (!meetsContrastAndLightness) return false;
+                    if (isBaseGrayScale) return true; // For grayscale, saturation doesn't matter for selection, will be zeroed out later
+                    return p.hsl.s >= MIN_SATURATION_FOR_ACCENT; // For color, require saturation
+                })
+                .sort((a, b) => { // Prioritize saturation (if not grayscale), then contrast
+                    if (isBaseGrayScale) return b.contrast - a.contrast; // For grayscale, only contrast matters for sorting
+                    return b.hsl.s - a.hsl.s || b.contrast - a.contrast;
+                });
 
             if (potentialPrimaries.length > 0) {
-                primaryAccent = potentialPrimaries[0].hex;
+                let chosenPrimaryHsl = potentialPrimaries[0].hsl;
+                if (isBaseGrayScale) {
+                    chosenPrimaryHsl.s = 0; // Force grayscale if base is grayscale
+                }
+                primaryAccent = hslToHex(chosenPrimaryHsl.h, chosenPrimaryHsl.s, chosenPrimaryHsl.l);
             }
         }
 
         // Derive a light primary accent if not found from palette
         if (!primaryAccent) {
             let paHsl = hexToHSL(bgColor); // Start with main background's HSL for hue
-            paHsl.h = (paHsl.h + 40) % 360; // Hue shift for accent
-            paHsl.s = Math.min(1, Math.max(0.45, paHsl.s + 0.1)); // Ensure good saturation (min 0.45)
+            if (isBaseGrayScale) {
+                paHsl.s = 0; // Grayscale accent
+            } else {
+                paHsl.h = (paHsl.h + 40) % 360; // Hue shift for accent
+                paHsl.s = Math.min(1, Math.max(0.45, paHsl.s + 0.1)); // Ensure good saturation (min 0.45)
+            }
             paHsl.l = 0.70; // Make it a light color (e.g., 70% lightness)
             primaryAccent = hslToHex(paHsl.h, paHsl.s, paHsl.l);
 
             // Ensure contrast with the dark surface
             if (getWCAGContrastRatio(primaryAccent, surface) < MIN_CONTRAST_PRIMARY_ON_SURFACE) {
                 paHsl.l = 0.75; // Try even lighter
+                // paHsl.s is already correctly set (0 if grayscale, or saturated otherwise)
                 primaryAccent = hslToHex(paHsl.h, paHsl.s, paHsl.l);
                  if (getWCAGContrastRatio(primaryAccent, surface) < MIN_CONTRAST_PRIMARY_ON_SURFACE) {
-                    primaryAccent = '#89b3ff'; // A fallback light blue accent, legible on dark surfaces
+                    if (isBaseGrayScale) {
+                        primaryAccent = '#D3D3D3'; // Light gray fallback for grayscale themes
+                    } else {
+                        primaryAccent = '#89b3ff'; // A fallback light blue accent, legible on dark surfaces
+                    }
                  }
             }
         }
+
+        // Ensure the final primary accent color has a minimum target luminance.
+        // This step modifies the color by increasing HSL lightness if necessary.
+        let currentCalculatedAccent = primaryAccent;
+        let currentLuminance = getLuminance(currentCalculatedAccent);
+
+        if (currentLuminance < MIN_TARGET_LUMINANCE_FOR_PRIMARY_ACCENT) {
+            let tempHsl = hexToHSL(currentCalculatedAccent);
+            
+            // Only try to increase lightness if it's not already maxed out
+            if (tempHsl.l < 1.0) {
+                for (let i = 0; i < 20; i++) { // Iterate up to 20 times (0.05 * 20 = 1.0, covers full HSL.l range)
+                    tempHsl.l += 0.05; // Increment HSL lightness
+                    if (tempHsl.l > 1.0) {
+                        tempHsl.l = 1.0;
+                    }
+                    currentCalculatedAccent = hslToHex(tempHsl.h, tempHsl.s, tempHsl.l);
+                    currentLuminance = getLuminance(currentCalculatedAccent);
+                    if (currentLuminance >= MIN_TARGET_LUMINANCE_FOR_PRIMARY_ACCENT || tempHsl.l >= 1.0) {
+                        break; // Target met or HSL lightness maxed out
+                    }
+                }
+            }
+            primaryAccent = currentCalculatedAccent; // Update the main primaryAccent variable
+        }
+
         const onPrimary = getContrastColor(primaryAccent);
 
         // --- Secondary Container ---
@@ -437,12 +494,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const potentialSecondaries = accentPalette
                 .filter(hex => hex.toUpperCase() !== primaryAccent.toUpperCase()) // Different from primary
                 .map(hex => ({ hex, hsl: hexToHSL(hex) }))
-                .sort((a,b) => b.hsl.s - a.hsl.s); // Pick another saturated one if available
+                .sort((a,b) => { // Pick another saturated one if available (if not grayscale)
+                    if (isBaseGrayScale) return 0; // No preference based on saturation if grayscale
+                    return b.hsl.s - a.hsl.s;
+                });
             if (potentialSecondaries.length > 0) {
                 let secondaryHex = potentialSecondaries[0].hex;
                 let secondaryHsl = hexToHSL(secondaryHex);
-                // Reduce saturation to make it less vibrant, M3 tonal colors are often less saturated
-                secondaryHsl.s = Math.min(secondaryHsl.s, 0.4); // Cap saturation (e.g., 40%)
+                if (isBaseGrayScale) {
+                    secondaryHsl.s = 0; // Force grayscale if base is grayscale
+                } else {
+                    // Reduce saturation to make it less vibrant, M3 tonal colors are often less saturated
+                    secondaryHsl.s = Math.min(secondaryHsl.s, 0.4); // Cap saturation (e.g., 40%)
+                }
                 secondaryContainer = hslToHex(secondaryHsl.h, secondaryHsl.s, secondaryHsl.l);
             }
         }
@@ -451,6 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Derive tonal secondary container from the new dark 'surface' color
             // Since surface is dark, getLuminance(surface) will be low, so this adds 12% lightness.
             secondaryContainer = lightenDarkenColor(surface, getLuminance(surface) > 0.5 ? -10 : 12);
+            // If surface is grayscale, secondaryContainer will also be grayscale.
             if (areColorsSimilar(rgbToArr(hexToRgb(secondaryContainer)), rgbToArr(hexToRgb(primaryAccent)), 25)) {
                 secondaryContainer = lightenDarkenColor(surface, 18); // More distinct tonal from surface
             }
@@ -803,6 +868,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (wasHidden && !debugMenu.classList.contains('menu-hidden')) {
                 debugMenu.style.top = DEFAULT_MENU_TOP; debugMenu.style.left = DEFAULT_MENU_LEFT;
                 debugMenu.classList.remove('collapsed'); 
+                if (debugMenuContent) {
+                    debugMenuContent.scrollTop = 0; // Scroll to top
+                }
             }
         }
     });
@@ -1802,6 +1870,9 @@ function loadDefaultColors() {
                 debugMenu.style.top = DEFAULT_MENU_TOP; // Reset position
                 debugMenu.style.left = DEFAULT_MENU_LEFT;
                 debugMenu.classList.remove('collapsed'); // Ensure it's not collapsed
+                if (debugMenuContent) {
+                    debugMenuContent.scrollTop = 0; // Scroll to top
+                }
                 cornerImageTapCount = 0; // Reset tap count after opening
             }
         });
