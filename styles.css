@@ -403,6 +403,7 @@ canvas {
   width: auto;
   user-select: none;
   opacity: .8;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3)); /* Subtle drop shadow for the signature SVG */
   pointer-events: none;
 }
 
@@ -455,6 +456,7 @@ canvas {
   -webkit-user-drag: none;
   pointer-events: auto;
   font-weight: 300; 
+  text-shadow: 0 2px 5px rgba(0,0,0,0.3); /* Subtle drop shadow for menu button text */
   /* mix-blend-mode: multiply; /* Removed: problematic on dark bg, makes links too dark/invisible */
   position: relative;
 }
