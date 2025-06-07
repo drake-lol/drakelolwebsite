@@ -41,8 +41,12 @@
         <a class="b" href="https://www.roblox.com/users/76034569">roblox</a>
         <a class="b" id="lastfm-button">Last.fm</a> <!-- This is the button JS will target -->
     </div>
-    <img src="/assets/bgimg/newsquare7_512.png" alt="Corner Image" class="corner-image">
+    <div class="corner-image-container">
+        <img src="/assets/bgimg/newsquare7_512.png" alt="Corner Image" class="corner-image">
+    </div>
 
+    <!-- Raining Cakes Container -->
+    <div id="raining-cakes-container"></div>
     <div id="scene-container">
         <div id="blur-layer-1" class="blur-layer">
             <!-- canvas-host is now the direct child for simplified blur -->
@@ -65,6 +69,10 @@
             <div>Shapes: <span id="on-screen-shape-count">0</span></div> 
             <div>Transition Shapes: <span id="on-screen-transition-shape-count">0</span></div>
             <div>FPS: <span id="fps-counter">0</span></div>
+            <div class="control-group" id="birthday-mode-control-group" style="display: none;">
+                <input type="checkbox" id="birthday-mode-toggle">
+                <label for="birthday-mode-toggle">Birthday Mode</label>
+            </div>
             <div class="control-group">
                 <input type="checkbox" id="blur-toggle" checked>
                 <label for="blur-toggle">Canvas Blur</label>

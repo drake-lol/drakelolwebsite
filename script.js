@@ -17,6 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const debugMenuCloseBtn = document.getElementById('debug-menu-close-btn');
     const debugMenuCollapseBtn = document.getElementById('debug-menu-collapse-btn');    
     const debugMenuContent = debugMenu ? debugMenu.querySelector('.debug-menu-content') : null;
+    const birthdayModeControlGroup = document.getElementById('birthday-mode-control-group');
+    const birthdayModeToggle = document.getElementById('birthday-mode-toggle');
     const pauseResumeBtn = document.getElementById('pause-resume-btn');
     const deleteAllShapesBtn = document.getElementById('delete-all-shapes-btn'); 
     const colorPaletteControlsContainer = document.getElementById('color-palette-controls');
@@ -51,13 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastfmTrackDiv = document.getElementById('lastfm-track');
     const lastfmArtistDiv = document.getElementById('lastfm-artist');
     const lastfmAlbumDiv = document.getElementById('lastfm-album');
-    const lastfmBpmDiv = document.getElementById('lastfm-bpm'); // BPM display element
+    const lastfmBpmDiv = document.getElementById('lastfm-bpm'); 
     const fetchLastFmBtn = document.getElementById('fetch-lastfm-btn');
 
     const cornerImage = document.querySelector('.corner-image');
     // Blur layer elements
     const blurLayer1 = document.getElementById('blur-layer-1');
     const canvasHost = document.getElementById('canvas-host'); // Innermost div, canvas parent
+
     let twoJsCanvas = null; 
     let isDragging = false;
     let dragStartX, dragStartY; 
@@ -144,7 +147,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_BLUR_PER_LAYER = 50; // Max blur (px) per layer, scaled for 64x64 (was 50px for 512x512)
 
     // --- START: Old Menu Integration ---
+    // --- START: Raining Cakes Variables ---
+    const rainingCakesContainer = document.getElementById('raining-cakes-container');
+    let activeRainingCakes = [];
+    const MAX_RAINING_CAKES = 15;
+    const RAIN_CAKE_SPAWN_INTERVAL = 300; // ms
+    let lastRainCakeSpawnTime = 0; 
+    const RAIN_CAKE_MIN_SPEED = 0.08; // pixels per ms (doubled from 0.04)
+    const RAIN_CAKE_MAX_SPEED = 0.24;  // pixels per ms (doubled from 0.12)
+    const RAIN_CAKE_WIDTH = 60; // px, must match CSS
+    const RAIN_CAKE_HEIGHT = 80; // px, must match CSS
     const OLD_MENU_FAVICON_BASE_SRC = '/assets/favicon/newsquare7_128trans.png';
+
+    // --- Birthday Mode Variables ---
+    function isJuly5th() { // Renamed for clarity
+        const today = new Date();
+        return today.getMonth() === 6 && today.getDate() === 5; // Month is 0-indexed (July is 6)
+    }
+    let isBirthdayModeActive = isJuly5th(); // Automatically active on July 5th
+
 
     let oldMenuLastFmButton = null;
     let oldMenuSignatureSVGs = null;
@@ -541,6 +562,108 @@ document.addEventListener('DOMContentLoaded', () => {
         rootStyle.setProperty('--m3-on-surface-variant', onSurfaceVariant);
         rootStyle.setProperty('--m3-outline', outline);
     }
+
+    // --- Raining Cake Color Logic & Management ---
+    // Global cake color variables and determineGlobalCakeLayerColors are removed.
+    // Colors will be assigned per-cake.
+
+    function getRandomColorFromPalette(fallbackColor) {
+        if (colorPalette && colorPalette.length > 0) {
+            return colorPalette[Math.floor(Math.random() * colorPalette.length)];
+        } else {
+            return fallbackColor;
+        }
+    }
+
+    function updateAllActiveCakeColors() {
+        // This function is now intentionally left mostly empty.
+        // Existing cakes will retain the colors they were spawned with.
+        // New cakes will pick up new palette colors via createSmallCakeElement.
+        // We might still want to update something global related to cakes here in the future,
+        // but not individual existing cake colors.
+    }
+
+    function removeAllRainingCakes() {
+        activeRainingCakes.forEach(cakeData => {
+            if (cakeData.element.parentNode === rainingCakesContainer) {
+                rainingCakesContainer.removeChild(cakeData.element);
+            }
+        });
+        activeRainingCakes = [];
+        // console.log("All raining cakes removed.");
+    }
+
+
+    function createSmallCakeElement() {
+        const cakeDiv = document.createElement('div');
+        cakeDiv.className = 'small-cake';
+
+        const base = document.createElement('div');
+        base.className = 'small-cake-layer small-cake-base';
+        let baseColor = getRandomColorFromPalette('#424242'); // Fallback dark gray for base
+        base.style.backgroundColor = baseColor;
+
+        const frosting = document.createElement('div');
+        frosting.className = 'small-cake-layer small-cake-frosting';
+        let frostingColor = getRandomColorFromPalette('#F5F5F5');
+        frosting.style.backgroundColor = frostingColor;
+
+        const cherries = document.createElement('div');
+        cherries.className = 'small-cake-layer small-cake-cherries';
+        let cherryColor;
+        if (colorPalette && colorPalette.length > 1) {
+            const availableForCherries = colorPalette.filter(c => c.toUpperCase() !== frostingColor.toUpperCase());
+            if (availableForCherries.length > 0) {
+                cherryColor = availableForCherries[Math.floor(Math.random() * availableForCherries.length)];
+            } else { // All colors in palette are the same as frosting
+                cherryColor = frostingColor;
+            }
+        } else if (colorPalette && colorPalette.length === 1) {
+            cherryColor = colorPalette[0]; // Only one color, use it
+        } else {
+            cherryColor = '#C62828'; // Fallback if palette is empty
+        }
+        cherries.style.backgroundColor = cherryColor;
+
+
+        cakeDiv.appendChild(base);
+        cakeDiv.appendChild(frosting);
+        cakeDiv.appendChild(cherries);
+
+        return {
+            mainElement: cakeDiv,
+            baseElement: base,
+            frostingElement: frosting,
+            cherriesElement: cherries
+        };
+    }
+
+    function spawnSmallCake() {
+        if (!isBirthdayModeActive || !rainingCakesContainer || activeRainingCakes.length >= MAX_RAINING_CAKES) {
+            return;
+        }
+
+        const cakeElements = createSmallCakeElement();
+        const cakeDiv = cakeElements.mainElement;
+
+        cakeDiv.style.top = `-${RAIN_CAKE_HEIGHT}px`;
+        cakeDiv.style.left = `${Math.random() * (window.innerWidth - RAIN_CAKE_WIDTH)}px`;
+
+        const cakeData = {
+            element: cakeDiv,
+            baseElement: cakeElements.baseElement,
+            frostingElement: cakeElements.frostingElement,
+            cherriesElement: cakeElements.cherriesElement,
+            y: -RAIN_CAKE_HEIGHT,
+            speed: getRandomFloat(RAIN_CAKE_MIN_SPEED, RAIN_CAKE_MAX_SPEED),
+            rotation: Math.random() * 360,
+            rotationSpeed: (Math.random() - 0.5) * 0.2 // degrees per ms
+        };
+
+        rainingCakesContainer.appendChild(cakeDiv);
+        activeRainingCakes.push(cakeData);
+    }
+
     // UI elements like color pickers and sliders will be fully initialized
     // by performInitialSceneSetupIfNeeded based on Last.fm data or defaults.
     function initializeColorPaletteUI() { 
@@ -582,6 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     scheduleOldColorCleanup(); // Schedule cleanup before changing the palette
                     colorPalette[colorIndex] = newHexColor; // Update the master palette
                     updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
+                    updateAllActiveCakeColors(); 
                 }
             });
             group.appendChild(label);
@@ -780,6 +904,7 @@ document.addEventListener('DOMContentLoaded', () => {
         targetBackgroundColor = e.target.value;
         backgroundColorTransitionStartTime = performance.now();
         isBackgroundTransitioning = true;
+        updateAllActiveCakeColors();
         updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
         spawnTransitionShapes(); // Spawn transition shapes
         // The animation loop will call applyBlurEffect
@@ -1341,6 +1466,29 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // --- Raining Cakes Logic ---
+        if (isBirthdayModeActive && rainingCakesContainer && (currentTime - lastRainCakeSpawnTime > RAIN_CAKE_SPAWN_INTERVAL)) {
+            spawnSmallCake();
+            lastRainCakeSpawnTime = currentTime;
+        }
+
+        for (let i = activeRainingCakes.length - 1; i >= 0; i--) {
+            const cakeData = activeRainingCakes[i];
+            cakeData.y += cakeData.speed * deltaTime;
+            
+            cakeData.rotation += cakeData.rotationSpeed * deltaTime;
+            cakeData.element.style.transform = `rotate(${cakeData.rotation}deg)`;
+            cakeData.element.style.top = `${cakeData.y}px`;
+
+            if (cakeData.y > window.innerHeight) {
+                // Check if parentNode exists and is the correct container before removing
+                if (cakeData.element.parentNode === rainingCakesContainer) {
+                    rainingCakesContainer.removeChild(cakeData.element);
+                }
+                activeRainingCakes.splice(i, 1);
+            }
+        }
+
         // --- Transition Shapes Update Loop ---
         const FADE_DURATION = 500; // ms for fade in/out of transition shapes
         // currentOnScreenTransitionShapes is reset at the start of the update loop
@@ -1684,10 +1832,8 @@ function applyDefaultColors() {
     previousBackgroundColorForTransition = currentAnimatedBackgroundColor;
     targetBackgroundColor = defaultBackgroundColor;
     backgroundColorTransitionStartTime = performance.now();
-    isBackgroundTransitioning = true;    
-    // Ensure defaultColorPalette itself contains uppercase hex strings if not already
     colorPalette = defaultColorPalette.length > 0 ? [...defaultColorPalette.map(c => c.toUpperCase())] : [];
-    // If applying default colors, the UI palette should also reflect this.
+    updateAllActiveCakeColors();
     initializeColorPaletteUI(false); // Update UI pickers to show default palette (or random if defaults not loaded)
     updateDynamicM3ThemeColors(defaultBackgroundColor, defaultColorPalette);
 }
@@ -1751,6 +1897,7 @@ function performInitialSceneSetupIfNeeded() {
         if (backgroundColorPicker) backgroundColorPicker.value = targetBackgroundColor;
         updateBackgroundOverlayState(targetBackgroundColor); // Set initial overlay state
         updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette); // Set M3 theme
+        updateAllActiveCakeColors(); // Determine and apply colors to any existing cakes
         initializeColorPaletteUI(); // Update UI based on the now populated colorPalette
         adjustShapesArray(); // Spawn shapes
         initialSceneSetupPerformed = true; // Mark that initial setup is done
@@ -1825,6 +1972,7 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
                 firstLastFmColorChangeDone = true; // Mark that the first color change has happened
             }
             updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
+            updateAllActiveCakeColors();
             initializeColorPaletteUI(); // Update palette UI with new colors
 
             // applyBlurEffect will be handled by the animation loop for smooth transition
@@ -2007,6 +2155,20 @@ function loadDefaultColors() {
     }
     applyPostProcessingFilters(); // Apply initial post-processing filter state
 
+    // --- Birthday Mode UI Setup ---
+    if (birthdayModeControlGroup && birthdayModeToggle) {
+        if (isJuly5th()) {
+            birthdayModeControlGroup.style.display = 'flex'; // Or 'block' depending on your layout needs
+            birthdayModeToggle.checked = isBirthdayModeActive;
+
+            birthdayModeToggle.addEventListener('change', (e) => {
+                isBirthdayModeActive = e.target.checked;
+                if (!isBirthdayModeActive) {
+                    removeAllRainingCakes();
+                }
+            });
+        }
+    }
     // --- Page Visibility API ---
     function handleVisibilityChange() {
         if (document.hidden) {
@@ -2037,4 +2199,5 @@ function loadDefaultColors() {
         }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange, false);
+
 }); // End of main DOMContentLoaded
