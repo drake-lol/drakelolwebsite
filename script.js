@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                            // Adjust between 0.4 (dims more colors) and 0.7 (dims only very bright colors).
 
     let colorPalette = []; 
-
+    let defaultColorPalette = []; // Will be updated from default image: Array of {color: string, weight: number}
     // Background Color Transition Variables
     let targetBackgroundColor = '#181818';   // The desired final background color
     let previousBackgroundColorForTransition = '#181818'; // The color we are transitioning FROM
@@ -128,8 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const REINIT_BATCH_DIVISOR = 30; // Process 1/30th of shapes per frame for re-initialization
     const DEFAULT_IMAGE_URL = '/assets/bgimg/newsquare7_512.png'; // Path to your default image
     let defaultBackgroundColor = '#121212'; // Will be updated from default image
-    let defaultColorsLoaded = false; // New flag
-    let defaultColorPalette = []; // Will be updated from default image
+    let defaultColorsLoaded = false; 
 
     let isInitialShapeSpawn = true; // Flag for initial center spawning
     // Variables for delayed old color cleanup
@@ -317,8 +316,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // If background isn't light, check if any color in the palette is light
         if (!activateOverlay) {
-            for (const color of colorPalette) {
-                if (getLuminance(color) > LUMINANCE_THRESHOLD) {
+            for (const item of colorPalette) { // Iterate over items {color, weight}
+                if (getLuminance(item.color) > LUMINANCE_THRESHOLD) { // Use item.color
                     activateOverlay = true;
                     break;
                 }
@@ -437,10 +436,10 @@ document.addEventListener('DOMContentLoaded', () => {
         let primaryAccent = null;
         if (accentPalette.length > 0) {
             const potentialPrimaries = accentPalette
-                .map(hex => ({
-                    hex,
-                    contrast: getWCAGContrastRatio(hex, surface), // Check contrast against the dark surface
-                    hsl: hexToHSL(hex)
+                .map(item => ({ // item is {color, weight}
+                    hex: item.color, // Use item.color for hex value
+                    contrast: getWCAGContrastRatio(item.color, surface), 
+                    hsl: hexToHSL(item.color)
                 }))
                 // Filter for light accents with good contrast on dark surface and decent saturation
                 .filter(p => {
@@ -521,14 +520,14 @@ document.addEventListener('DOMContentLoaded', () => {
         let secondaryContainer = null;
         if (accentPalette.length > 0) {
             const potentialSecondaries = accentPalette
-                .filter(hex => hex.toUpperCase() !== primaryAccent.toUpperCase()) // Different from primary
-                .map(hex => ({ hex, hsl: hexToHSL(hex) }))
+                .filter(item => item.color.toUpperCase() !== primaryAccent.toUpperCase()) // Use item.color
+                .map(item => ({ hex: item.color, hsl: hexToHSL(item.color) })) // Use item.color
                 .sort((a,b) => { // Pick another saturated one if available (if not grayscale)
                     if (isBaseGrayScale) return 0; // No preference based on saturation if grayscale
                     return b.hsl.s - a.hsl.s;
                 });
             if (potentialSecondaries.length > 0) {
-                let secondaryHex = potentialSecondaries[0].hex;
+                let secondaryHex = potentialSecondaries[0].hex; // This is now correctly a hex string
                 let secondaryHsl = hexToHSL(secondaryHex);
                 if (isBaseGrayScale) {
                     secondaryHsl.s = 0; // Force grayscale if base is grayscale
@@ -567,12 +566,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // Global cake color variables and determineGlobalCakeLayerColors are removed.
     // Colors will be assigned per-cake.
 
-    function getRandomColorFromPalette(fallbackColor) {
-        if (colorPalette && colorPalette.length > 0) {
-            return colorPalette[Math.floor(Math.random() * colorPalette.length)];
-        } else {
+    function getRandomColorFromPaletteWeighted(palette, fallbackColor = '#CCCCCC') {
+        if (!palette || palette.length === 0) {
             return fallbackColor;
         }
+
+        const totalWeight = palette.reduce((sum, item) => sum + item.weight, 0);
+        if (totalWeight === 0) { // All weights are zero, pick uniformly
+            return palette[Math.floor(Math.random() * palette.length)].color;
+        }
+
+        let randomVal = Math.random() * totalWeight;
+        for (const item of palette) {
+            if (randomVal < item.weight) {
+                return item.color;
+            }
+            randomVal -= item.weight;
+        }
+        // Fallback, should ideally not be reached if weights are positive
+        return palette.length > 0 ? palette[palette.length - 1].color : fallbackColor;
+    }
+
+    function getRandomColorFromPalette(fallbackColor) {
+        return getRandomColorFromPaletteWeighted(colorPalette, fallbackColor);
+    }
+
+    function getRandomColorFromPaletteUnweighted(palette, fallbackColor = '#CCCCCC') {
+        if (!palette || palette.length === 0) {
+            return fallbackColor;
+        }
+        // palette is an array of {color: string, weight: number}
+        return palette[Math.floor(Math.random() * palette.length)].color;
     }
 
     function updateAllActiveCakeColors() {
@@ -600,30 +624,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const base = document.createElement('div');
         base.className = 'small-cake-layer small-cake-base';
-        let baseColor = getRandomColorFromPalette('#424242'); // Fallback dark gray for base
+        let baseColor = getRandomColorFromPaletteUnweighted(colorPalette, '#424242'); // Use unweighted for cakes
         base.style.backgroundColor = baseColor;
 
         const frosting = document.createElement('div');
         frosting.className = 'small-cake-layer small-cake-frosting';
-        let frostingColor = getRandomColorFromPalette('#F5F5F5');
+        let frostingColor = getRandomColorFromPaletteUnweighted(colorPalette, '#F5F5F5'); // Use unweighted for cakes
         frosting.style.backgroundColor = frostingColor;
 
         const cherries = document.createElement('div');
         cherries.className = 'small-cake-layer small-cake-cherries';
         let cherryColor;
         if (colorPalette && colorPalette.length > 1) {
-            const availableForCherries = colorPalette.filter(c => c.toUpperCase() !== frostingColor.toUpperCase());
+            const availableForCherries = colorPalette.filter(item => item.color.toUpperCase() !== frostingColor.toUpperCase());
             if (availableForCherries.length > 0) {
-                cherryColor = availableForCherries[Math.floor(Math.random() * availableForCherries.length)];
+                cherryColor = availableForCherries[Math.floor(Math.random() * availableForCherries.length)].color;
             } else { // All colors in palette are the same as frosting
                 cherryColor = frostingColor;
             }
         } else if (colorPalette && colorPalette.length === 1) {
-            cherryColor = colorPalette[0]; // Only one color, use it
+            cherryColor = colorPalette[0].color; // Use the color property
         } else {
             cherryColor = '#C62828'; // Fallback if palette is empty
         }
-        cherries.style.backgroundColor = cherryColor;
+        cherries.style.backgroundColor = cherryColor; // cherryColor is now guaranteed to be a hex string
 
 
         cakeDiv.appendChild(base);
@@ -677,8 +701,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Optionally, one could add a placeholder or a single picker for the background color here.
         }
 
+        const totalWeight = colorPalette.reduce((sum, item) => sum + item.weight, 0);
+        // console.log("Total weight for palette UI:", totalWeight);
+        // console.log("Current palette for UI:", JSON.parse(JSON.stringify(colorPalette)));
+
+
         for (let i = 0; i < colorPalette.length; i++) {
-            const currentColorHex = colorPalette[i]; // The color is already in the master palette
+            const currentColorHex = colorPalette[i].color; 
 
             if (!currentColorHex) {
                 // This case should ideally not happen if colorPalette is populated correctly.
@@ -689,8 +718,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const group = document.createElement('div');
             group.classList.add('color-input-group');
             const label = document.createElement('label');
+            label.classList.add('color-picker-label'); // Added class for specific styling
             label.setAttribute('for', `color-picker-${i}`);
-            label.textContent = `Color ${i + 1}:`;
+            
+            const percentage = (totalWeight > 0) ? (colorPalette[i].weight / totalWeight) * 100 : 0;
+            label.textContent = `${percentage.toFixed(1)}% Color ${i + 1}:`;
+
             const input = document.createElement('input');
             input.setAttribute('type', 'color');
             input.setAttribute('id', `color-picker-${i}`);
@@ -702,8 +735,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newHexColor = e.target.value.toUpperCase();
                 // Ensure the index is valid for the current colorPalette
                 if (colorIndex < colorPalette.length && colorPalette[colorIndex]?.toUpperCase() !== newHexColor) {
-                    scheduleOldColorCleanup(); // Schedule cleanup before changing the palette
-                    colorPalette[colorIndex] = newHexColor; // Update the master palette
+                    scheduleOldColorCleanup(); 
+                    colorPalette[colorIndex].color = newHexColor; // Update the color in the master palette, weight remains
                     updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
                     updateAllActiveCakeColors(); 
                 }
@@ -1052,10 +1085,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (colorPalette.length === 0) {
             // If current palette is empty, shapes are likely using the fallback color.
             // Treat the main fallback color as the "old color" to be cleaned up if the new palette has actual colors.
-            previousColorPaletteForCleanup = ['#CCCCCC'.toUpperCase()]; // Default fallback for initializeShape
+            previousColorPaletteForCleanup = ['#CCCCCC']; // Default fallback for initializeShape
         } else {
             // Deep copy the current palette, ensuring uppercase for consistent comparison
-            previousColorPaletteForCleanup = colorPalette.map(color => color.toUpperCase());
+            previousColorPaletteForCleanup = colorPalette.map(item => item.color.toUpperCase());
         }
         paletteChangeTimestampForCleanup = performance.now();
         cleanupTriggeredForCurrentPaletteChange = false; // A new cleanup cycle is pending
@@ -1088,12 +1121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Halved factors to halve proportional scale on 512px canvas (original factors were 0.50, 1.10)
         const baseSize = getRandomFloat(minScreenDim * 0.25, minScreenDim * 0.55) * currentScaleMultiplier; 
         
-        // Always pick a color from the current palette. Do not rely on or store paletteIndex on shapeData.
-        let initialColorHex = '#CCCCCC'; // Default fallback color
-        if (colorPalette.length > 0) {
-            const colorIndex = getRandomInt(0, colorPalette.length - 1);
-            initialColorHex = colorPalette[colorIndex];
-        }
+        let initialColorHex = getRandomColorFromPaletteWeighted(colorPalette, '#CCCCCC');
 
         let newTwoShape; let approxWidth, approxHeight; 
         switch (shapeType) {
@@ -1197,13 +1225,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Halved factors for transition shapes as well (original factors were 0.75, 1.65)
         const baseSize = getRandomFloat(minScreenDim * 0.375, minScreenDim * 0.825) * currentScaleMultiplier;
 
-        // Transition shapes use the current global colorPalette
-        // Always pick a color from the current palette. Do not rely on or store paletteIndex on shapeData.
-        let initialColorHex = '#FFFFFF'; // Default fallback for transition shapes
-        if (colorPalette.length > 0) {
-            const colorIndex = getRandomInt(0, colorPalette.length - 1);
-            initialColorHex = colorPalette[colorIndex];
-        }
+        let initialColorHex = getRandomColorFromPaletteWeighted(colorPalette, '#FFFFFF');
 
         let newTwoShape; let approxWidth, approxHeight;
         switch (shapeType) {
@@ -1350,7 +1372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- Delayed Old Color Cleanup Logic - Part 1: Identify and mark shapes for scaling ---
         if (!cleanupTriggeredForCurrentPaletteChange && previousColorPaletteForCleanup.length > 0 && (currentTime - paletteChangeTimestampForCleanup > CLEANUP_START_DELAY)) {
             // console.log("Cleanup start delay met. Identifying shapes for scaling. Old palette:", previousColorPaletteForCleanup);
-            const currentPaletteSet = new Set(colorPalette.map(c => c.toUpperCase())); // Set of current palette colors (uppercase)
+            const currentPaletteSet = new Set(colorPalette.map(item => item.color.toUpperCase())); // Set of current palette colors (uppercase)
             let shapesMovedToFadeOut = 0;
 
             // Iterate backwards as we are modifying shapesData by splicing
@@ -1832,7 +1854,7 @@ function applyDefaultColors() {
     previousBackgroundColorForTransition = currentAnimatedBackgroundColor;
     targetBackgroundColor = defaultBackgroundColor;
     backgroundColorTransitionStartTime = performance.now();
-    colorPalette = defaultColorPalette.length > 0 ? [...defaultColorPalette.map(c => c.toUpperCase())] : [];
+    colorPalette = defaultColorPalette.length > 0 ? defaultColorPalette.map(item => ({ ...item })) : []; // Deep copy
     updateAllActiveCakeColors();
     initializeColorPaletteUI(false); // Update UI pickers to show default palette (or random if defaults not loaded)
     updateDynamicM3ThemeColors(defaultBackgroundColor, defaultColorPalette);
@@ -1842,8 +1864,11 @@ function arePalettesRoughlyEqual(paletteA, paletteB) {
     if (!paletteA || !paletteB) return false; // Ensure both palettes exist
     if (paletteA.length !== paletteB.length) return false;
     if (paletteA.length === 0 && paletteB.length === 0) return true;
+    // Compare both color and weight for equality
     for (let i = 0; i < paletteA.length; i++) {
-        if (paletteA[i] !== paletteB[i]) return false;
+        if (paletteA[i].color !== paletteB[i].color || paletteA[i].weight !== paletteB[i].weight) {
+            return false;
+        }
     }
     return true;
 }
@@ -1944,27 +1969,35 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
                 }
             }
 
-            tempColorPaletteHolder = []; // Initialize to hold hex colors
+            tempColorPaletteHolder = []; // Initialize to hold {color, weight} objects
             if (uniquePaletteRgb.length > 0) {
-                uniquePaletteRgb.forEach(rgb => {
-                    tempColorPaletteHolder.push(rgbToHex(rgb[0], rgb[1], rgb[2]));
+                const numUniqueColors = uniquePaletteRgb.length;
+                uniquePaletteRgb.forEach((rgb, index) => {
+                    tempColorPaletteHolder.push({
+                        color: rgbToHex(rgb[0], rgb[1], rgb[2]).toUpperCase(),
+                        weight: numUniqueColors - index // Higher weight for earlier (more dominant) colors
+                    });
                 });
             } else {
                 // Fallback if no unique colors are found after filtering,
                 // or if ColorThief initially returned no palette.
+                let fallbackHex = '#CCCCCC';
                 if (targetBackgroundColor) { // Use dominant color as the primary fallback
-                    tempColorPaletteHolder.push(targetBackgroundColor);
+                    fallbackHex = targetBackgroundColor;
                 } else if (paletteRgb && paletteRgb.length > 0) { // If dominant failed but original palette had something
-                    tempColorPaletteHolder.push(rgbToHex(paletteRgb[0][0], paletteRgb[0][1], paletteRgb[0][2]));
-                } else { // Absolute fallback
-                    tempColorPaletteHolder.push('#CCCCCC');
+                    fallbackHex = rgbToHex(paletteRgb[0][0], paletteRgb[0][1], paletteRgb[0][2]).toUpperCase();
                 }
+                tempColorPaletteHolder.push({ color: fallbackHex, weight: 1 });
             }
-            colorPalette = tempColorPaletteHolder.map(c => c.toUpperCase()); // Assign the new dynamic palette
+            colorPalette = tempColorPaletteHolder; // Assign the new dynamic palette
+
             console.log(`Extracted ${colorPalette.length} colors from album art.`); // Log the number of colors
             if (backgroundColorPicker) {
                 backgroundColorPicker.value = targetBackgroundColor;
             }
+            
+            // Ensure M3 themes and cakes are updated with the new palette structure
+            updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
 
             if (firstLastFmColorChangeDone) {
                 spawnTransitionShapes(); // Spawn only after the first successful color change
@@ -1972,7 +2005,6 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
                 firstLastFmColorChangeDone = true; // Mark that the first color change has happened
             }
             updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
-            updateAllActiveCakeColors();
             initializeColorPaletteUI(); // Update palette UI with new colors
 
             // applyBlurEffect will be handled by the animation loop for smooth transition
@@ -2031,14 +2063,20 @@ function loadDefaultColors() {
             }
 
             if (uniqueDefaultPaletteRgb.length > 0) {
-                defaultColorPalette = uniqueDefaultPaletteRgb.map(c => rgbToHex(...c).toUpperCase());
+                const numUniqueColors = uniqueDefaultPaletteRgb.length;
+                defaultColorPalette = uniqueDefaultPaletteRgb.map((rgb, index) => ({
+                    color: rgbToHex(...rgb).toUpperCase(),
+                    weight: numUniqueColors - index // Higher weight for earlier (more dominant) colors
+                }));
             } else {
                 // Fallback if ColorThief returns no palette for the default image
                 // or if all colors were too similar.
-                if (defaultBackgroundColor) { defaultColorPalette = [defaultBackgroundColor]; }
-                else { defaultColorPalette = ['#CCCCCC']; } // Absolute fallback
+                let fallbackHex = defaultBackgroundColor ? defaultBackgroundColor.toUpperCase() : '#CCCCCC';
+                defaultColorPalette = [{ color: fallbackHex, weight: 1 }];
             }
-
+            
+            // Ensure M3 themes are updated if default colors are applied before Last.fm
+            // updateDynamicM3ThemeColors(defaultBackgroundColor, defaultColorPalette); // This might be too early if Last.fm overrides
             defaultColorsLoaded = true;
             console.log("Default colors loaded successfully.");
         } catch (e) { console.error("Error loading default colors:", e); }

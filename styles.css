@@ -305,11 +305,58 @@ canvas {
     display: flex;
     align-items: center;
     margin-bottom: 5px;
+    width: 100%; /* Ensures the group takes the full available width */
 }
+
+/* The rule below might be too general if other labels within .color-input-group
+   (that are NOT .color-picker-label) still require a fixed width.
+   If all labels within .color-input-group are intended to be flexible like the
+   color palette ones, this rule could be removed or its 'width' property adjusted.
+   For now, it's overridden by the more specific rule for .color-picker-label.
+*/
 .color-input-group label {
     width: 80px; 
     margin-left: 0;
 }
+
+/* Specific styling for the dynamically created percentage/color name labels */
+.color-input-group label.color-picker-label {
+    flex-grow: 1; /* Allows the label to expand and take up available horizontal space */
+    width: auto; /* Overrides the fixed width from the general '.color-input-group label' rule */
+    margin-right: 8px; /* Adds a small space between the label and the color input box */
+    text-align: left; /* Ensures text is aligned to the left within its flexible space */
+}
+
+/* Ensure the color input itself doesn't shrink if space is tight */
+.color-input-group input[type="color"] {
+    flex-shrink: 0;
+}
+
+/* --- Styles for the Background Color Picker --- */
+/* Group containing the background color picker */
+.debug-menu-content div:has(> input#background-color-picker) {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    /* margin-bottom is typically inherited from .control-group or .debug-menu-content div */
+}
+
+/* Label for the background color picker (e.g., "Background Color:") */
+/* This targets a label associated with background-color-picker, likely having class "color-label" */
+.debug-menu-content div:has(> input#background-color-picker) > label[for="background-color-picker"] {
+    flex-grow: 1; /* Allow the label to expand */
+    width: auto;  /* Override any fixed width (e.g., from .color-input-group label if it were that) */
+    margin-left: 0; /* Override general .debug-menu-content label margin-left */
+    margin-right: 8px; /* Space between label and the color input */
+    text-align: left; /* Align text to the left */
+    /* Ensure display:block from .color-label doesn't interfere if present; flex item behavior takes precedence */
+    display: inline-block; /* Or simply let flex properties manage it */
+    vertical-align: middle; /* Consistent vertical alignment */
+    margin-bottom: 0; /* Remove bottom margin if it was set by .color-label or general label rules */
+}
+/* The input#background-color-picker itself will inherit general input[type="color"] styles,
+   and flex-shrink:0 is good if it were in a .color-input-group, but not strictly needed here as the label takes space. */
+
 /* Last.fm specific styling for cleaner text layout */
 .lastfm-text-details { /* New wrapper for text */
     display: flex;
