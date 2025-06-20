@@ -74,6 +74,9 @@ body {
 }
 canvas {
     display: block; 
+    image-rendering: pixelated; /* Modern browsers */
+    image-rendering: -moz-crisp-edges; /* Firefox */
+    image-rendering: crisp-edges; /* Older spec, still useful for some browsers */
 }
 #debug-menu {
     position: absolute;

@@ -127,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastFmArtProcessing = false; // Flag to indicate if Last.fm album art is currently being processed
     const REINIT_BATCH_DIVISOR = 30; // Process 1/30th of shapes per frame for re-initialization
     const DEFAULT_IMAGE_URL = '/assets/bgimg/newsquare7_512.png'; // Path to your default image
+    let previousFrameAnimatedBgColor = '#121212'; // Initialize with a default or the initial background
     let defaultBackgroundColor = '#121212'; // Will be updated from default image
     let defaultColorsLoaded = false; 
 
@@ -140,10 +141,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let cornerImageTapCount = 0;
     let lastCornerImageTapTime = 0;
     const TAP_INTERVAL_THRESHOLD = 700; // Taps must be within 700ms of each other
-    const REQUIRED_TAPS_FOR_DEBUG = 7;
+    const REQUIRED_TAPS_FOR_DEBUG = 7; 
 
     let dynamicBlurLayers = []; // To store dynamically created blur layers
-    const MAX_BLUR_PER_LAYER = 50; // Max blur (px) per layer, scaled for 64x64 (was 50px for 512x512)
+    // Viewport-relative blur constants
+    const SLIDER_MAX_BLUR_INTENSITY = 300;     // Max value of the blur-intensity-slider in HTML (0-300)
+    const MAX_DESIRED_TOTAL_BLUR_VW = 27.77;   // Slider at 300 -> ~300px blur on 1080p (27.77vw of 1080px)
+    const MAX_BLUR_PER_LAYER_VW = 14.55;       // Each stacked blur layer can contribute up to ~157px on 1080p (14.55vw of 1080px)
 
     // --- START: Old Menu Integration ---
     // --- START: Raining Cakes Variables ---
@@ -749,10 +753,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial background color values will be set by default image loading or Last.fm
     targetBackgroundColor = '#121212'; // Temporary default
     previousBackgroundColorForTransition = '#121212'; // Temporary default
-    currentAnimatedBackgroundColor = '#121212';
-    
+    currentAnimatedBackgroundColor = '#121212'; 
+
     // backgroundColorPicker.value will be set by performInitialSceneSetupIfNeeded
-    
+
+    // Helper function to update the blur intensity display
+    function updateBlurIntensityDisplay() {
+        if (blurIntensityValueDisplay && typeof currentBlurIntensity !== 'undefined') {
+            const viewportMinDim = Math.min(window.innerWidth, window.innerHeight);
+            const displayBlurPx = (currentBlurIntensity / SLIDER_MAX_BLUR_INTENSITY) * MAX_DESIRED_TOTAL_BLUR_VW * viewportMinDim / 100;
+            let finalDisplayValue;
+            const nearestMultipleOf50 = Math.round(displayBlurPx / 50) * 50;
+            if (Math.abs(displayBlurPx - nearestMultipleOf50) <= 4) {
+                finalDisplayValue = nearestMultipleOf50;
+            } else {
+                finalDisplayValue = Math.round(displayBlurPx);
+            }
+            blurIntensityValueDisplay.textContent = finalDisplayValue.toString();
+        }
+    }
+
+    // Initialize UI values
     numShapesSlider.value = currentNumShapes;
     numShapesValueDisplay.textContent = currentNumShapes;
     scaleSlider.value = currentScaleMultiplier;
@@ -768,12 +789,9 @@ document.addEventListener('DOMContentLoaded', () => {
             numTransitionShapesValueDisplay.textContent = currentNumTransitionShapes;
         }
         // Event listener for numTransitionShapesSlider is correctly placed later
-    }
-    blurIntensitySlider.value = currentBlurIntensity; // Set slider to new default
-    blurIntensityValueDisplay.textContent = currentBlurIntensity;
-    // NOTE: For 64x64 canvas, consider adjusting the HTML max attribute for blur-intensity-slider.
-    // e.g., <input type="range" id="blur-intensity-slider" min="0" max="75" value="25">
-    // Original was max="300" for a 512x512 canvas and 200px default blur.
+    } 
+    if (blurIntensitySlider) blurIntensitySlider.value = currentBlurIntensity;
+    updateBlurIntensityDisplay(); // Set initial display for blur intensity
 
     brightnessSlider.value = currentBrightness;
     brightnessValueDisplay.textContent = currentBrightness;
@@ -814,6 +832,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Style the canvas to stretch to fill its parent (canvasHost)
         twoJsCanvas.style.width = '100%';
         twoJsCanvas.style.height = '100%';
+        twoJsCanvas.style.imageRendering = 'pixelated'; // For sharp pixel look when scaled
         // twoJsCanvas.style.backgroundColor will be handled by applyBlurEffect
     } else {
         console.error("Two.js canvas element not found after initialization.");
@@ -862,17 +881,23 @@ document.addEventListener('DOMContentLoaded', () => {
         // 3. Apply new blur effect if enabled
         if (blurToggle.checked && currentBlurIntensity > 0) {
             // BLUR IS ON
+            const viewportMinDim = Math.min(window.innerWidth, window.innerHeight);
+            // Calculate effective total blur in pixels based on viewport and slider intensity
+            const effectiveTotalBlurPx = (currentBlurIntensity / SLIDER_MAX_BLUR_INTENSITY) * MAX_DESIRED_TOTAL_BLUR_VW * viewportMinDim / 100;
+            // Calculate max blur per layer in pixels based on viewport
+            const calculatedMaxBlurPerLayerPx = MAX_BLUR_PER_LAYER_VW * viewportMinDim / 100;
+
             // Scale blurLayer1 to provide an oversized area, preventing hard edges from blur.
             blurLayer1.style.width = '104%';
             blurLayer1.style.height = '104%';
-            blurLayer1.style.top = '-2%';
-            blurLayer1.style.left = '-2%';
+            blurLayer1.style.top = '-2%'; // Adjust to keep it centered
+            blurLayer1.style.left = '-2%'; // Adjust to keep it centered
 
-            let remainingBlur = currentBlurIntensity;
+            let remainingBlur = effectiveTotalBlurPx;
             let currentParentForNextLayer = blurLayer1;
 
             // Create intermediate blur layers if needed
-            while (remainingBlur > MAX_BLUR_PER_LAYER) {
+            while (remainingBlur > calculatedMaxBlurPerLayerPx && calculatedMaxBlurPerLayerPx > 0) { // Ensure calculatedMaxBlurPerLayerPx is positive
                 const dynamicLayer = document.createElement('div');
                 dynamicLayer.style.position = 'absolute';
                 dynamicLayer.style.width = '100%';
@@ -880,14 +905,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 dynamicLayer.style.top = '0';
                 dynamicLayer.style.left = '0';
                 dynamicLayer.style.backgroundColor = 'transparent';
-                dynamicLayer.style.filter = `blur(${MAX_BLUR_PER_LAYER}px)`;
+                dynamicLayer.style.filter = `blur(${calculatedMaxBlurPerLayerPx}px)`;
                 dynamicLayer.style.willChange = 'filter'; // Hint for performance
 
                 currentParentForNextLayer.appendChild(dynamicLayer);
                 dynamicBlurLayers.push(dynamicLayer);
                 currentParentForNextLayer = dynamicLayer;
-
-                remainingBlur -= MAX_BLUR_PER_LAYER;
+                remainingBlur -= calculatedMaxBlurPerLayerPx;
             }
 
             // canvasHost gets the background color and any final remaining blur
@@ -919,8 +943,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     blurToggle.addEventListener('change', () => applyBlurEffect(currentAnimatedBackgroundColor));
     blurIntensitySlider.addEventListener('input', (e) => {
-        currentBlurIntensity = parseInt(e.target.value);
-        blurIntensityValueDisplay.textContent = currentBlurIntensity;
+        currentBlurIntensity = parseInt(e.target.value); 
+        updateBlurIntensityDisplay(); // Update the displayed value
         applyBlurEffect(currentAnimatedBackgroundColor); 
     });
     // Ensure numTransitionShapesSlider event listener is here if it wasn't before or was misplaced
@@ -1350,10 +1374,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update overlay state based on the final currentAnimatedBackgroundColor for this frame
         updateBackgroundOverlayState(currentAnimatedBackgroundColor);
 
-        // Update old menu elements style and theme meta tag based on currentAnimatedBackgroundColor
-        if (typeof updateOldMenuElementsStyle === 'function') { // Check if function exists, useful during dev/refactor
-            updateOldMenuElementsStyle();
-            updateOldMenuThemeMetaTag();
+        // Conditionally update old menu elements style and theme meta tag
+        // Only call these if the background color has actually changed since the last frame.
+        if (currentAnimatedBackgroundColor !== previousFrameAnimatedBgColor) {
+            if (typeof updateOldMenuElementsStyle === 'function') {
+                updateOldMenuElementsStyle();
+                updateOldMenuThemeMetaTag();
+            }
+            previousFrameAnimatedBgColor = currentAnimatedBackgroundColor;
         }
         // Apply blur effect only if relevant properties have changed
         if (twoJsCanvas) {
@@ -1597,6 +1625,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (twoJsCanvas) {
                 applyBlurEffect(currentAnimatedBackgroundColor);
             }
+            updateBlurIntensityDisplay(); // Update the displayed value as it's viewport-dependent
 
             // Adjust debug menu position
             if (debugMenu.offsetLeft + debugMenu.offsetWidth > window.innerWidth) debugMenu.style.left = (window.innerWidth - debugMenu.offsetWidth) + 'px';
