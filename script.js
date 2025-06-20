@@ -1219,6 +1219,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.removeEventListener('mousemove', onDrag);
         document.removeEventListener('mouseup', onDragEnd);
     }
+
+    // Debounce utility function
+    function debounce(func, delay) {
+        let timeout;
+        return function(...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), delay);
+        };
+    }
     
     function applyPostProcessingFilters() {
         if (!container) return; // scene-container
@@ -1235,6 +1245,9 @@ document.addEventListener('DOMContentLoaded', () => {
             container.style.filter = 'none';
         }
     }
+    
+    // Create a debounced version of applyPostProcessingFilters
+    const debouncedApplyPostProcessingFilters = debounce(applyPostProcessingFilters, 150); // 150ms delay
 
     const shapesData = []; 
     const fadingOutShapesData = []; // Array for shapes being cleaned up due to palette change

@@ -9,7 +9,6 @@
     <link rel="icon" href="/assets/favicon/newsquare7_128trans.png" type="image/png">
     <meta name="theme-color" content="#000000">
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js"></script>
 </head>
 <body>
     <div class="signature-container">
@@ -166,7 +165,9 @@
             </div>
         </div>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/two.js/0.8.12/two.min.js"></script>
+    <!-- Scripts moved to the end of body and deferred for non-blocking loading -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/two.js/0.8.12/two.min.js" defer></script>
     <script src="script.js" defer></script>
 </body>
 </html>
