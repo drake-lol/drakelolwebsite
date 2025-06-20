@@ -53,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastfmTrackDiv = document.getElementById('lastfm-track');
     const lastfmArtistDiv = document.getElementById('lastfm-artist');
     const lastfmAlbumDiv = document.getElementById('lastfm-album');
-    const lastfmBpmDiv = document.getElementById('lastfm-bpm'); 
     const fetchLastFmBtn = document.getElementById('fetch-lastfm-btn');
 
     const cornerImage = document.querySelector('.corner-image');
@@ -65,6 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let isDragging = false;
     let dragStartX, dragStartY; 
     let menuInitialX, menuInitialY; 
+    let menuWidthForDrag, menuHeightForDrag; // Cached dimensions for dragging
+
 
     const DEFAULT_MENU_TOP = '20px'; 
     // const DEFAULT_MENU_LEFT = '20px'; // Defined later, ensure no conflict
@@ -103,6 +104,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let backgroundColorTransitionStartTime = 0;
     let isBackgroundTransitioning = false;
     // --- Last.fm Integration Variables (moved inside DOMContentLoaded) ---
+    // State for optimized updateBackgroundOverlayState calls
+    let prevFrameAnimatedBgColorForOverlay = '#121212'; // Initialize with default
+    let prevFrameColorPaletteForOverlay = []; // Initialize with empty array
+
     // Variables to track state for applyBlurEffect optimization
     let prevAnimatedBgColorForBlur = currentAnimatedBackgroundColor;
     let prevBlurToggleState = blurToggle.checked;
@@ -1047,6 +1052,8 @@ document.addEventListener('DOMContentLoaded', () => {
             menuInitialX = debugMenu.offsetLeft; menuInitialY = debugMenu.offsetTop;
             document.addEventListener('mousemove', onDrag);
             document.addEventListener('mouseup', onDragEnd);
+            menuWidthForDrag = debugMenu.offsetWidth; // Cache width
+            menuHeightForDrag = debugMenu.offsetHeight; // Cache height
         });
         debugMenuCollapseBtn.addEventListener('click', (e) => { e.stopPropagation(); debugMenu.classList.toggle('collapsed'); });
         debugMenuCloseBtn.addEventListener('click', (e) => { e.stopPropagation(); debugMenu.classList.add('menu-hidden'); });
@@ -1067,9 +1074,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function onDrag(e) {
         if (!isDragging) return;
         const dx = e.clientX - dragStartX; const dy = e.clientY - dragStartY;
-        let newLeft = menuInitialX + dx; let newTop = menuInitialY + dy;
-        const maxLeft = window.innerWidth - debugMenu.offsetWidth;
-        const maxTop = window.innerHeight - debugMenu.offsetHeight;
+        let newLeft = menuInitialX + dx; let newTop = menuInitialY + dy; 
+        const maxLeft = window.innerWidth - menuWidthForDrag; // Use cached width
+        const maxTop = window.innerHeight - menuHeightForDrag; // Use cached height
         newLeft = Math.max(0, Math.min(newLeft, maxLeft)); newTop = Math.max(0, Math.min(newTop, maxTop));
         debugMenu.style.left = newLeft + 'px'; debugMenu.style.top = newTop + 'px';
     }
@@ -1371,9 +1378,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Update overlay state based on the final currentAnimatedBackgroundColor for this frame
-        updateBackgroundOverlayState(currentAnimatedBackgroundColor);
-
+        // Update overlay state only if background color or palette has changed
+        // Note: Comparing colorPalette references is sufficient because the array reference
+        // is reassigned when the palette changes (in extractAndApplyColorsFromAlbumArt and applyDefaultColors).
+        if (currentAnimatedBackgroundColor !== prevFrameAnimatedBgColorForOverlay || colorPalette !== prevFrameColorPaletteForOverlay) {
+            updateBackgroundOverlayState(currentAnimatedBackgroundColor);
+            prevFrameAnimatedBgColorForOverlay = currentAnimatedBackgroundColor;
+            prevFrameColorPaletteForOverlay = colorPalette;
+        }
+        
         // Conditionally update old menu elements style and theme meta tag
         // Only call these if the background color has actually changed since the last frame.
         if (currentAnimatedBackgroundColor !== previousFrameAnimatedBgColor) {
@@ -1703,7 +1716,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update UI IF the song currently displayed in the UI is the one this fetch was for.
             // This handles race conditions where the UI might have changed again *during* the await fetch().
             if (lastfmTrackDiv.textContent === trackTitleToFetch && lastfmArtistDiv.textContent === artistToFetch) {
-                lastfmBpmDiv.textContent = resultBpmText;
+                // lastfmBpmDiv was removed
             }
 
         } catch (error) {
@@ -1713,7 +1726,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 lastBpmDisplayValue = errorBpmText;
             }
             if (lastfmTrackDiv.textContent === trackTitleToFetch && lastfmArtistDiv.textContent === artistToFetch) {
-                lastfmBpmDiv.textContent = errorBpmText;
+                // lastfmBpmDiv was removed
             }
         }
     }
@@ -1731,10 +1744,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lastfmTrackDiv.textContent = '-';
             lastfmArtistDiv.textContent = '-';
             lastfmAlbumDiv.textContent = '-';
-            if (lastfmBpmDiv) {
-                lastfmBpmDiv.textContent = '-';
-                lastfmBpmDiv.style.display = 'none';
-            }
+            // lastfmBpmDiv was removed
             lastQueriedArtistForBpm = ''; // Reset BPM tracking state
             lastQueriedTrackForBpm = '';
             lastBpmDisplayValue = '';
@@ -1757,30 +1767,28 @@ document.addEventListener('DOMContentLoaded', () => {
             lastfmArtistDiv.textContent = currentArtistName;
             lastfmAlbumDiv.textContent = track.album['#text'] || 'Unknown Album';
 
-            if (lastfmBpmDiv) {
-                if (track.bpm && track.bpm !== "0") { // BPM available directly from Last.fm
-                    lastBpmDisplayValue = `BPM: ${track.bpm}`;
-                    lastfmBpmDiv.textContent = lastBpmDisplayValue;
-                    lastfmBpmDiv.style.display = 'block';
-                    // Update our knowledge of this song's BPM status
+            if (track.bpm && track.bpm !== "0") { // BPM available directly from Last.fm
+                lastBpmDisplayValue = `BPM: ${track.bpm}`;
+                // lastfmBpmDiv.textContent = lastBpmDisplayValue; // lastfmBpmDiv was removed
+                // lastfmBpmDiv.style.display = 'block'; // lastfmBpmDiv was removed
+                // Update our knowledge of this song's BPM status
+                lastQueriedArtistForBpm = currentArtistName;
+                lastQueriedTrackForBpm = currentTrackName;
+            } else {
+                // BPM not available from Last.fm, decide whether to fetch from TheAudioDB
+                if (currentArtistName !== lastQueriedArtistForBpm || currentTrackName !== lastQueriedTrackForBpm) {
+                    // This is a new song, or we haven't queried for this specific song before.
                     lastQueriedArtistForBpm = currentArtistName;
                     lastQueriedTrackForBpm = currentTrackName;
+                    lastBpmDisplayValue = 'BPM: Fetching...'; // Set initial state for this new query
+                    // lastfmBpmDiv.textContent = lastBpmDisplayValue; // lastfmBpmDiv was removed
+                    // lastfmBpmDiv.style.display = 'block'; // lastfmBpmDiv was removed
+                    fetchBpmFromAudioDB(currentArtistName, currentTrackName);
                 } else {
-                    // BPM not available from Last.fm, decide whether to fetch from TheAudioDB
-                    if (currentArtistName !== lastQueriedArtistForBpm || currentTrackName !== lastQueriedTrackForBpm) {
-                        // This is a new song, or we haven't queried for this specific song before.
-                        lastQueriedArtistForBpm = currentArtistName;
-                        lastQueriedTrackForBpm = currentTrackName;
-                        lastBpmDisplayValue = 'BPM: Fetching...'; // Set initial state for this new query
-                        lastfmBpmDiv.textContent = lastBpmDisplayValue;
-                        lastfmBpmDiv.style.display = 'block';
-                        fetchBpmFromAudioDB(currentArtistName, currentTrackName);
-                    } else {
-                        // Same song as the last query, display the stored/previous result for it.
-                        // lastBpmDisplayValue could be "Fetching...", "N/A", or an actual BPM.
-                        lastfmBpmDiv.textContent = lastBpmDisplayValue;
-                        lastfmBpmDiv.style.display = 'block';
-                    }
+                    // Same song as the last query, display the stored/previous result for it.
+                    // lastBpmDisplayValue could be "Fetching...", "N/A", or an actual BPM.
+                    // lastfmBpmDiv.textContent = lastBpmDisplayValue; // lastfmBpmDiv was removed
+                    // lastfmBpmDiv.style.display = 'block'; // lastfmBpmDiv was removed
                 }
             }
             
@@ -1811,10 +1819,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lastfmTrackDiv.textContent = '-';
             lastfmArtistDiv.textContent = '-';
             lastfmAlbumDiv.textContent = '-';
-            if (lastfmBpmDiv) {
-                lastfmBpmDiv.textContent = '-';
-                lastfmBpmDiv.style.display = 'none';
-            }
+            // lastfmBpmDiv was removed
             lastQueriedArtistForBpm = ''; // Reset BPM tracking state
             lastQueriedTrackForBpm = '';
             lastBpmDisplayValue = '';
