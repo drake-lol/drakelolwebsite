@@ -31,6 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const rotationValueDisplay = document.getElementById('rotation-value');
     const speedSlider = document.getElementById('speed-slider');
     const speedValueDisplay = document.getElementById('speed-value');
+    // New UI Elements for Resolution Slider
+    const resolutionSlider = document.getElementById('resolution-slider');
+    const resolutionValueDisplay = document.getElementById('resolution-value');
     
     const numTransitionShapesSlider = document.getElementById('num-transition-shapes-slider');
     const numTransitionShapesValueDisplay = document.getElementById('num-transition-shapes-value');
@@ -77,6 +80,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentMovementSpeedMultiplier = 1.0;
     let currentNumTransitionShapes = 10; // Default, will be synced with slider
     let currentBlurIntensity = 200; // Default blur intensity scaled for 64x64 canvas (was 200px for 512x512)
+
+    // Define available resolutions
+    const RESOLUTIONS = [
+        { width: 16, height: 16, label: "16x16" },
+        { width: 32, height: 32, label: "32x32" },
+        { width: 64, height: 64, label: "64x64" },
+        { width: 128, height: 128, label: "128x128" },
+        { width: 256, height: 256, label: "256x256" },
+        { width: 512, height: 512, label: "512x512" },
+        { width: 1024, height: 1024, label: "1024x1024" },
+        { width: 2048, height: 2048, label: "2048x2048" }
+    ];
+    let currentResolutionIndex = 2; // Default to 64x64 (index 2)
+    let previousResolutionIndex = 0; // To store the index before a change
 
     // Post-processing state variables
     let currentBrightness = 80; // %
@@ -576,28 +593,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Colors will be assigned per-cake.
 
     function getRandomColorFromPaletteWeighted(palette, fallbackColor = '#CCCCCC') {
+    // Convert fallbackColor hex to a fallbackItem if it's not already an item
+    const fallbackItem = (typeof fallbackColor === 'string') ? { color: fallbackColor, weight: 1 } : fallbackColor;
+
         if (!palette || palette.length === 0) {
-            return fallbackColor;
+            return fallbackItem;
         }
 
         const totalWeight = palette.reduce((sum, item) => sum + item.weight, 0);
         if (totalWeight === 0) { // All weights are zero, pick uniformly
-            return palette[Math.floor(Math.random() * palette.length)].color;
+            return palette[Math.floor(Math.random() * palette.length)];
         }
 
         let randomVal = Math.random() * totalWeight;
         for (const item of palette) {
             if (randomVal < item.weight) {
-                return item.color;
+                return item;
             }
             randomVal -= item.weight;
         }
         // Fallback, should ideally not be reached if weights are positive
-        return palette.length > 0 ? palette[palette.length - 1].color : fallbackColor;
+        return palette.length > 0 ? palette[palette.length - 1] : fallbackItem;
     }
-
     function getRandomColorFromPalette(fallbackColor) {
-        return getRandomColorFromPaletteWeighted(colorPalette, fallbackColor);
+        const fallbackItem = { color: (fallbackColor || '#CCCCCC'), weight: 1 };
+        const chosenItem = getRandomColorFromPaletteWeighted(colorPalette, fallbackItem);
+        return chosenItem.color;
     }
 
     function getRandomColorFromPaletteUnweighted(palette, fallbackColor = '#CCCCCC') {
@@ -743,7 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const colorIndex = parseInt(e.target.dataset.index);
                 const newHexColor = e.target.value.toUpperCase();
                 // Ensure the index is valid for the current colorPalette
-                if (colorIndex < colorPalette.length && colorPalette[colorIndex]?.toUpperCase() !== newHexColor) {
+                if (colorIndex < colorPalette.length && colorPalette[colorIndex].color.toUpperCase() !== newHexColor) {
                     scheduleOldColorCleanup(); 
                     colorPalette[colorIndex].color = newHexColor; // Update the color in the master palette, weight remains
                     updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
@@ -812,15 +833,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const BASE_MIN_ROTATION_SPEED = 0.002; 
     const BASE_MAX_ROTATION_SPEED = 0.01;
-    const BASE_MIN_SPEED = 0.015625; // Scaled for 64x64 (was 0.125 for 512x512)
-    const BASE_MAX_SPEED = 0.078125; // Scaled for 64x64 (was 0.625 for 512x512)
+    const BASE_MIN_SPEED = 0.00390625; // Scaled for 16x16 (was 0.015625 for 64x64)
+    const BASE_MAX_SPEED = 0.01953125; // Scaled for 16x16 (was 0.078125 for 64x64)
     const SHAPE_TYPES = ['organic']; 
 
+    const BASE_RESOLUTION_WIDTH = 16; // The width our BASE_MIN_SPEED/MAX_SPEED are tuned for
+
     function calculateRenderDimensions() {
-        // Set rendering dimensions to a fixed 64x64
-        return { width: 64, height: 64 };
+        return RESOLUTIONS[currentResolutionIndex];
     }
-    
     const initialRenderDims = calculateRenderDimensions();
     const params = {
         type: Two.Types.webgl, 
@@ -838,11 +859,19 @@ document.addEventListener('DOMContentLoaded', () => {
         twoJsCanvas.style.width = '100%';
         twoJsCanvas.style.height = '100%';
         twoJsCanvas.style.imageRendering = 'pixelated'; // For sharp pixel look when scaled
-        // twoJsCanvas.style.backgroundColor will be handled by applyBlurEffect
     } else {
         console.error("Two.js canvas element not found after initialization.");
         twoJsCanvas = container.querySelector('canvas');
-         // if (twoJsCanvas) { /* its background will be handled by applyBlurEffect */ }
+    }
+
+    // Apply blur effect and then re-assert canvas 100% style for initial setup
+    if (twoJsCanvas) { 
+        applyBlurEffect(currentAnimatedBackgroundColor); // Apply blur which sets up parent styles
+        // Re-assert 100% size on the canvas itself after DOM manipulations by applyBlurEffect
+        twoJsCanvas.style.width = '100%';
+        twoJsCanvas.style.height = '100%';
+    } else { 
+        console.warn("Two.js canvas not found for initial blur effect application. Blur effect might not apply correctly until canvas is ready.");
     }
 
     function applyBlurEffect(bgColorToApply) {
@@ -939,11 +968,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    if (twoJsCanvas) { // Initial call
-        applyBlurEffect(currentAnimatedBackgroundColor);
-    } else { // Fallback if canvas not immediately available
-        console.warn("Two.js canvas not found for initial blur effect application. Blur effect might not apply correctly until canvas is ready.");
-    }
 
     // --- Event Listeners ---
     blurToggle.addEventListener('change', () => applyBlurEffect(currentAnimatedBackgroundColor));
@@ -953,7 +977,95 @@ document.addEventListener('DOMContentLoaded', () => {
         applyBlurEffect(currentAnimatedBackgroundColor); 
     });
     // Ensure numTransitionShapesSlider event listener is here if it wasn't before or was misplaced
+    if (resolutionSlider) {
+        resolutionSlider.min = 0;
+        resolutionSlider.max = RESOLUTIONS.length - 1;
+        resolutionSlider.value = currentResolutionIndex;
+        if (resolutionValueDisplay) resolutionValueDisplay.textContent = RESOLUTIONS[currentResolutionIndex].label;
+
+        resolutionSlider.addEventListener('input', (e) => {
+            const newIndex = parseInt(e.target.value);
+            if (newIndex !== currentResolutionIndex) {
+                previousResolutionIndex = currentResolutionIndex;
+                currentResolutionIndex = newIndex;
+                if (resolutionValueDisplay) resolutionValueDisplay.textContent = RESOLUTIONS[currentResolutionIndex].label;
+                handleChangeResolutionMode(previousResolutionIndex, currentResolutionIndex);
+            }
+        });
+    }
+
+    function handleChangeResolutionMode(oldIndex, newIndex) {
+        const oldRes = RESOLUTIONS[oldIndex];
+        const newRes = RESOLUTIONS[newIndex];
+        const scalingRatio = newRes.width / oldRes.width;
+
+        // 2. Update Two.js rendering dimensions.
+        // `calculateRenderDimensions` uses the new `isHighResModeActive`.
+        const newDims = calculateRenderDimensions();
+        two.width = newDims.width;
+        two.height = newDims.height;
+
+        // 3. Scale positions, sizes, and speeds of existing shapes.
+        const allShapeArrays = [shapesData, fadingOutShapesData, transitionShapesData];
+        allShapeArrays.forEach(arr => {
+            arr.forEach(sd => {
+                if (sd.twoShape) {
+                    // Scale position
+                    sd.twoShape.translation.x *= scalingRatio;
+                    sd.twoShape.translation.y *= scalingRatio;
+
+                    // Scale size
+                    if (sd.twoShape.radius !== undefined) { // Circle
+                        sd.twoShape.radius *= scalingRatio;
+                    } else if (sd.twoShape.width !== undefined && sd.twoShape.height !== undefined) { // Ellipse, Rectangle, RoundedRectangle
+                        sd.twoShape.width *= scalingRatio;
+                        sd.twoShape.height *= scalingRatio;
+                    } else if (sd.twoShape.vertices && sd.twoShape.vertices.length > 0) { // Path (organic shapes)
+                        // Assumes path.scale is a scalar or we want uniform scaling.
+                        // Two.Path defaults to scale = 1 (scalar).
+                        const currentPathScale = (typeof sd.twoShape.scale === 'number') ? sd.twoShape.scale : 1;
+                        sd.twoShape.scale = currentPathScale * scalingRatio;
+                    }
+
+                    // Scale approximate dimensions used for culling
+                    if (sd.approxWidth !== undefined) {
+                        sd.approxWidth *= scalingRatio;
+                    }
+                    if (sd.approxHeight !== undefined) {
+                        sd.approxHeight *= scalingRatio;
+                    }
+                }
+
+                // Scale velocities
+                if (sd.vx !== undefined) {
+                    sd.vx *= scalingRatio;
+                }
+                if (sd.vy !== undefined) {
+                    sd.vy *= scalingRatio;
+                }
+                // Rotation speed is independent of canvas resolution, so no change needed for sd.rotationSpeed
+            });
+        });
+
+        // 4. Apply blur effect. This is important as it might interact with canvas dimensions
+        // or its parent styling.
+        if (twoJsCanvas) applyBlurEffect(currentAnimatedBackgroundColor);
+
+        // 5. AFTER Two.js dimensions are set AND blur effect DOM might be restructured,
+        //    force the canvas element's style to 100% to ensure it stretches.
+        // Ensure this happens after Two.js might have set pixel styles internally.
+        if (twoJsCanvas) {
+            requestAnimationFrame(() => {
+                if (twoJsCanvas) { // Re-check in case of any edge conditions
+                    twoJsCanvas.style.width = '100%';
+                    twoJsCanvas.style.height = '100%';
+                }
+            });
+        }
+        // Shapes are not repopulated; they persist with adjusted speeds.
+    }
     if (numTransitionShapesSlider) {
+        // This listener was correctly placed.
         numTransitionShapesSlider.addEventListener('input', (e) => {
             currentNumTransitionShapes = parseInt(e.target.value);
             if (numTransitionShapesValueDisplay) {
@@ -1031,11 +1143,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     deleteAllShapesBtn.addEventListener('click', () => {
+        // Clear main shapes
         while (shapesData.length > 0) {
             const shapeDataToRemove = shapesData.pop();
-            if (shapeDataToRemove.twoShape) two.remove(shapeDataToRemove.twoShape);
+            if (shapeDataToRemove.twoShape && shapeDataToRemove.twoShape.parent) {
+                two.remove(shapeDataToRemove.twoShape);
+            }
         }
+        // Clear fading out shapes
+        while (fadingOutShapesData.length > 0) {
+            const shapeDataToRemove = fadingOutShapesData.pop();
+            if (shapeDataToRemove.twoShape && shapeDataToRemove.twoShape.parent) {
+                two.remove(shapeDataToRemove.twoShape);
+            }
+        }
+        // Clear transition shapes as well, for a full reset
+        while (transitionShapesData.length > 0) {
+            const shapeDataToRemove = transitionShapesData.pop();
+            if (shapeDataToRemove.twoShape && shapeDataToRemove.twoShape.parent) {
+                two.remove(shapeDataToRemove.twoShape);
+            }
+        }
+
         if (onScreenShapeCountDisplay) onScreenShapeCountDisplay.textContent = '0';
+        if (onScreenTransitionShapeCountDisplay) onScreenTransitionShapeCountDisplay.textContent = '0';
+
+        // After clearing, adjustShapesArray will repopulate shapesData to currentNumShapes
         adjustShapesArray(); 
     });
 
@@ -1139,7 +1272,10 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     function initializeShape(shapeData) {
-        if (shapeData.twoShape) two.remove(shapeData.twoShape);
+        if (shapeData.twoShape && shapeData.twoShape.parent) { // Check parent before removing
+             two.remove(shapeData.twoShape);
+        }
+        shapeData.twoShape = null; // Ensure it's cleared before creating a new one
         shapeData.needsReinitialization = false; // Reset reinitialization state
         // For debugging the specific issue:
         // if (shapeData.debugId) console.log(`DEBUG ${shapeData.debugId}: initializeShape called. Old color was ${shapeData.oldColorForDebug}, new palette first color ${colorPalette[0]}`);
@@ -1151,8 +1287,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const minScreenDim = Math.min(two.width, two.height) || 600; // Fallback if dimensions are 0, e.g. initial load
         // Halved factors to halve proportional scale on 512px canvas (original factors were 0.50, 1.10)
         const baseSize = getRandomFloat(minScreenDim * 0.25, minScreenDim * 0.55) * currentScaleMultiplier; 
-        
-        let initialColorHex = getRandomColorFromPaletteWeighted(colorPalette, '#CCCCCC');
+
+        const chosenColorItem = getRandomColorFromPaletteWeighted(colorPalette, { color: '#CCCCCC', weight: 1 });
+        const initialColorHex = chosenColorItem.color;
 
         let newTwoShape; let approxWidth, approxHeight; 
         switch (shapeType) {
@@ -1197,9 +1334,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
         }
 
+        let targetOpacity = 1.0;
+        const itemWeight = chosenColorItem.weight;
+
+        if (colorPalette.length > 0 && itemWeight > 0) {
+            const totalPaletteWeight = colorPalette.reduce((sum, pItem) => sum + pItem.weight, 0);
+            if (totalPaletteWeight > 0) {
+                const percentageOfTotalWeight = (itemWeight / totalPaletteWeight) * 100;
+
+                if (percentageOfTotalWeight < 15) { // Low percentage (less dominant)
+                    if (Math.random() < 0.6) { // 60% chance of lower opacity
+                        targetOpacity = getRandomFloat(0.5, 0.75);
+                    } else {
+                        targetOpacity = getRandomFloat(0.8, 1.0);
+                    }
+                } else if (percentageOfTotalWeight > 60) { // High percentage (more dominant)
+                    targetOpacity = 1.0;
+                } else { // Medium percentage
+                    if (Math.random() < 0.25) { // 25% chance of slightly lower opacity
+                        targetOpacity = getRandomFloat(0.75, 0.95);
+                    } else {
+                        targetOpacity = 1.0;
+                    }
+                }
+            }
+        }
         // Removed feathering/gradient logic. Shapes will now have a solid fill.
-        // The canvas-wide blur (if enabled) will blur these solid shapes.
-        newTwoShape.opacity = 1; // Ensure new/recycled shapes are fully visible
+        newTwoShape.opacity = targetOpacity;
         newTwoShape.fill = initialColorHex;
 
         newTwoShape.noStroke(); 
@@ -1208,8 +1369,9 @@ document.addEventListener('DOMContentLoaded', () => {
         shapeData.rotationSpeed = getRandomFloat(BASE_MIN_ROTATION_SPEED, BASE_MAX_ROTATION_SPEED) * currentRotationSpeedMultiplier * (Math.random() > 0.5 ? 1 : -1);
         shapeData.approxWidth = approxWidth; shapeData.approxHeight = approxHeight; // Store dimensions
         
-        const speed = getRandomFloat(BASE_MIN_SPEED, BASE_MAX_SPEED) * currentMovementSpeedMultiplier;
-    
+        const baseSpeedValue = getRandomFloat(BASE_MIN_SPEED, BASE_MAX_SPEED);
+        const resolutionSpeedFactor = (RESOLUTIONS[currentResolutionIndex].width / BASE_RESOLUTION_WIDTH);
+        const speed = baseSpeedValue * resolutionSpeedFactor * currentMovementSpeedMultiplier;
         if (isInitialShapeSpawn) {
             // For initial spawn, 50% chance to spawn in center (dispersed), 50% at an edge
             if (Math.random() < 0.5) {
@@ -1255,8 +1417,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const minScreenDim = Math.min(two.width, two.height) || 600;
         // Halved factors for transition shapes as well (original factors were 0.75, 1.65)
         const baseSize = getRandomFloat(minScreenDim * 0.375, minScreenDim * 0.825) * currentScaleMultiplier;
-
-        let initialColorHex = getRandomColorFromPaletteWeighted(colorPalette, '#FFFFFF');
+        const chosenColorItem = getRandomColorFromPaletteWeighted(colorPalette, { color: '#FFFFFF', weight: 1 });
+        const initialColorHex = chosenColorItem.color;
 
         let newTwoShape; let approxWidth, approxHeight;
         switch (shapeType) {
@@ -1300,8 +1462,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
         }
 
+        let targetOpacity = 1.0;
+        const itemWeight = chosenColorItem.weight;
+
+        if (colorPalette.length > 0 && itemWeight > 0) {
+            const totalPaletteWeight = colorPalette.reduce((sum, pItem) => sum + pItem.weight, 0);
+            if (totalPaletteWeight > 0) {
+                const percentageOfTotalWeight = (itemWeight / totalPaletteWeight) * 100;
+
+                if (percentageOfTotalWeight < 15) { // Low percentage (less dominant)
+                    if (Math.random() < 0.6) { // 60% chance of lower opacity
+                        targetOpacity = getRandomFloat(0.5, 0.75);
+                    } else {
+                        targetOpacity = getRandomFloat(0.8, 1.0);
+                    }
+                } else if (percentageOfTotalWeight > 60) { // High percentage (more dominant)
+                    targetOpacity = 1.0;
+                } else { // Medium percentage
+                    if (Math.random() < 0.25) { // 25% chance of slightly lower opacity
+                        targetOpacity = getRandomFloat(0.75, 0.95);
+                    } else {
+                        targetOpacity = 1.0;
+                    }
+                }
+            }
+        }
+        shapeData.targetOpacity = targetOpacity; // Store calculated target opacity
         newTwoShape.fill = initialColorHex;
-        newTwoShape.opacity = 0; // Start transparent, will fade in
+        newTwoShape.opacity = 0; // Start transparent, will fade in to shapeData.targetOpacity
         newTwoShape.noStroke();
         newTwoShape.rotation = getRandomFloat(0, Math.PI * 2);
 
@@ -1309,8 +1497,9 @@ document.addEventListener('DOMContentLoaded', () => {
         shapeData.rotationSpeed = getRandomFloat(BASE_MIN_ROTATION_SPEED, BASE_MAX_ROTATION_SPEED) * currentRotationSpeedMultiplier * 1.5 * (Math.random() > 0.5 ? 1 : -1);
         shapeData.approxWidth = approxWidth;
         shapeData.approxHeight = approxHeight;
-        const speed = getRandomFloat(BASE_MIN_SPEED, BASE_MAX_SPEED) * currentMovementSpeedMultiplier * 2.4; // Adjusted to maintain original absolute speed (was 1.2)
-
+        const baseSpeedValue = getRandomFloat(BASE_MIN_SPEED, BASE_MAX_SPEED);
+        const resolutionSpeedFactor = (RESOLUTIONS[currentResolutionIndex].width / BASE_RESOLUTION_WIDTH);
+        const speed = baseSpeedValue * resolutionSpeedFactor * currentMovementSpeedMultiplier * 2.4; // Apply multipliers
         // Spawn off-screen using a similar mechanism to regular shapes
         const offScreenOffset = Math.max(approxWidth, approxHeight) * 0.7;
         const spawnConfig = spawnConfigurations[getRandomInt(0, spawnConfigurations.length - 1)];
@@ -1320,17 +1509,26 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!newTwoShape.parent) two.add(newTwoShape);
     }
     function adjustShapesArray() {
-        while (shapesData.length > currentNumShapes) { const shapeDataToRemove = shapesData.pop(); if (shapeDataToRemove.twoShape) two.remove(shapeDataToRemove.twoShape); }
-        while (shapesData.length < currentNumShapes) { const shapeData = {}; shapesData.push(shapeData); initializeShape(shapeData); }
+        // Remove excess shapes
+        while (shapesData.length > currentNumShapes) {
+            const shapeDataToRemove = shapesData.pop();
+            if (shapeDataToRemove.twoShape && shapeDataToRemove.twoShape.parent) { // Check parent before removing
+                two.remove(shapeDataToRemove.twoShape);
+            }
+        }
+        // Add new shapes if needed
+        while (shapesData.length < currentNumShapes) {
+            const shapeData = { needsReinitialization: false }; // Initialize placeholder
+            shapesData.push(shapeData);
+            initializeShape(shapeData); // This will create and add the Two.js shape
+        }
     }
-    deleteAllShapesBtn.addEventListener('click', () => {
-        while (shapesData.length > 0) { const shapeDataToRemove = shapesData.pop(); if (shapeDataToRemove.twoShape) two.remove(shapeDataToRemove.twoShape); }
-        while (fadingOutShapesData.length > 0) { const shapeDataToRemove = fadingOutShapesData.pop(); if (shapeDataToRemove.twoShape) two.remove(shapeDataToRemove.twoShape); } // Clear fading shapes too
-        if (onScreenShapeCountDisplay) onScreenShapeCountDisplay.textContent = '0';
-        adjustShapesArray(); 
-    });
+    // Removed misplaced deleteAllShapesBtn listener from here
 
     function spawnTransitionShapes() {
+        // Only spawn transition shapes if the main shape count is greater than 0
+        if (currentNumShapes <= 0) return;
+
         // Clear existing transition shapes
         while (transitionShapesData.length > 0) {
             const shapeDataToRemove = transitionShapesData.pop();
@@ -1349,6 +1547,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentTime = performance.now(); const deltaTime = currentTime - lastTime; lastTime = currentTime;
         frameCountForFPS++; timeSinceLastFPSUpdate += deltaTime;
         let currentOnScreenShapes = 0;
+        // Cache two.width and two.height for use throughout this frame
+        const currentTwoWidth = two.width;
+        const currentTwoHeight = two.height;
+
         let currentOnScreenTransitionShapes = 0; // To count visible transition shapes
 
         // Background Color Transition Logic
@@ -1469,7 +1671,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const shapeRight = shapeData.twoShape.translation.x + shapeHalfWidth;
                     const shapeTop = shapeData.twoShape.translation.y - shapeHalfHeight;
                     const shapeBottom = shapeData.twoShape.translation.y + shapeHalfHeight;
-                    if (shapeRight > 0 && shapeLeft < two.width && shapeBottom > 0 && shapeTop < two.height) {
+                    if (shapeRight > 0 && shapeLeft < currentTwoWidth && shapeBottom > 0 && shapeTop < currentTwoHeight) {
                         currentOnScreenShapes++;
                     }
                 }
@@ -1505,11 +1707,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const shapeHalfWidth = shapeData.approxWidth / 2; const shapeHalfHeight = shapeData.approxHeight / 2;
             const shapeLeft = shape.translation.x - shapeHalfWidth; const shapeRight = shape.translation.x + shapeHalfWidth;
             const shapeTop = shape.translation.y - shapeHalfHeight; const shapeBottom = shape.translation.y + shapeHalfHeight;
-            if (shapeRight > 0 && shapeLeft < two.width && shapeBottom > 0 && shapeTop < two.height) currentOnScreenShapes++;
+            if (shapeRight > 0 && shapeLeft < currentTwoWidth && shapeBottom > 0 && shapeTop < currentTwoHeight) currentOnScreenShapes++;
 
             // Off-screen check for re-initialization
             const resetBuffer = Math.max(shapeData.approxWidth, shapeData.approxHeight) * 0.7;
-            const isWayOffScreen = shape.translation.x < -resetBuffer || shape.translation.x > two.width + resetBuffer || shape.translation.y < -resetBuffer || shape.translation.y > two.height + resetBuffer;
+            const isWayOffScreen = shape.translation.x < -resetBuffer || shape.translation.x > currentTwoWidth + resetBuffer || shape.translation.y < -resetBuffer || shape.translation.y > currentTwoHeight + resetBuffer;
             if (isWayOffScreen) {
                 if (shape.parent) two.remove(shape); // Ensure removal from Two.js scene
                 shapeData.twoShape = null;
@@ -1573,7 +1775,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fade In
             if (shapeData.isFadingIn) {
                 const fadeInProgress = Math.min(elapsedTimeSinceSpawn / FADE_DURATION, 1);
-                shape.opacity = fadeInProgress;
+                shape.opacity = fadeInProgress * (shapeData.targetOpacity !== undefined ? shapeData.targetOpacity : 1.0);
                 if (fadeInProgress >= 1) {
                     shapeData.isFadingIn = false;
                 }
@@ -1587,9 +1789,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Off-screen check for removal
             const resetBuffer = Math.max(shapeData.approxWidth, shapeData.approxHeight) * 0.7; 
             const isWayOffScreen = shape.translation.x < -resetBuffer ||
-                                   shape.translation.x > two.width + resetBuffer ||
+                                   shape.translation.x > currentTwoWidth + resetBuffer ||
                                    shape.translation.y < -resetBuffer ||
-                                   shape.translation.y > two.height + resetBuffer;
+                                   shape.translation.y > currentTwoHeight + resetBuffer;
 
             if (isWayOffScreen) {
                 two.remove(shape);
@@ -1637,6 +1839,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (twoJsCanvas) {
                 applyBlurEffect(currentAnimatedBackgroundColor);
+                // After blur effect and potential DOM changes, re-assert 100% size on the canvas itself
+                // This ensures it stretches correctly after a resize.
+                twoJsCanvas.style.width = '100%';
+                twoJsCanvas.style.height = '100%';
             }
             updateBlurIntensityDisplay(); // Update the displayed value as it's viewport-dependent
 
@@ -1888,6 +2094,7 @@ function applyDefaultColors() {
     previousBackgroundColorForTransition = currentAnimatedBackgroundColor;
     targetBackgroundColor = defaultBackgroundColor;
     backgroundColorTransitionStartTime = performance.now();
+    isBackgroundTransitioning = true; // Ensure transition is triggered
     colorPalette = defaultColorPalette.length > 0 ? defaultColorPalette.map(item => ({ ...item })) : []; // Deep copy
     updateAllActiveCakeColors();
     initializeColorPaletteUI(false); // Update UI pickers to show default palette (or random if defaults not loaded)
@@ -2009,7 +2216,7 @@ async function extractAndApplyColorsFromAlbumArt(imageUrl) {
                 uniquePaletteRgb.forEach((rgb, index) => {
                     tempColorPaletteHolder.push({
                         color: rgbToHex(rgb[0], rgb[1], rgb[2]).toUpperCase(),
-                        weight: numUniqueColors - index // Higher weight for earlier (more dominant) colors
+                        weight: Math.sqrt(numUniqueColors - index) // Weight based on sqrt of dominance order
                     });
                 });
             } else {
@@ -2100,7 +2307,7 @@ function loadDefaultColors() {
                 const numUniqueColors = uniqueDefaultPaletteRgb.length;
                 defaultColorPalette = uniqueDefaultPaletteRgb.map((rgb, index) => ({
                     color: rgbToHex(...rgb).toUpperCase(),
-                    weight: numUniqueColors - index // Higher weight for earlier (more dominant) colors
+                    weight: Math.sqrt(numUniqueColors - index) // Weight based on sqrt of dominance order
                 }));
             } else {
                 // Fallback if ColorThief returns no palette for the default image

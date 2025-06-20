@@ -75,6 +75,11 @@
                 <label for="birthday-mode-toggle">Birthday Mode</label>
             </div>
             <div class="control-group">
+                <!-- Replaced checkbox with a slider for resolution -->
+                <label for="resolution-slider" class="slider-label">Resolution: <span id="resolution-value">16x16</span></label>
+                <input type="range" id="resolution-slider" min="0" max="4" value="2" step="1"> <!-- Min/Max will be set by JS based on available resolutions, default value set to 2 (64x64) -->
+            </div>
+            <div class="control-group">
                 <input type="checkbox" id="blur-toggle" checked>
                 <label for="blur-toggle">Canvas Blur</label>
             </div>

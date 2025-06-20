@@ -72,11 +72,12 @@ body {
 #scene-container.light-bg::before {
   background-color: rgba(0, 0, 0, 0.3); /* Adjust opacity for desired dimming */
 }
-canvas {
+canvas, .small-cake-layer { /* Combined image-rendering */
     display: block; 
     image-rendering: pixelated; /* Modern browsers */
     image-rendering: -moz-crisp-edges; /* Firefox */
     image-rendering: crisp-edges; /* Older spec, still useful for some browsers */
+    /* Note: .small-cake-layer specific background-blend-mode is kept separate */
 }
 #debug-menu {
     position: absolute;
@@ -160,14 +161,12 @@ canvas {
 #debug-menu.collapsed #debug-menu-collapse-btn .toggle-icon {
     transform: rotate(-90deg);
 }
-.window-control-button:hover {
+.window-control-button:hover { /* Base hover for all window control buttons */
     background-color: rgba(var(--m3-on-surface-r, 230), var(--m3-on-surface-g, 225), var(--m3-on-surface-b, 229), var(--m3-state-hover-on-surface-opacity));
-    /* Define --m3-on-surface-r/g/b in :root if using this, or use a fixed color: */
-    /* background-color: rgba(230, 225, 229, 0.08); */
 }
 #debug-menu-close-btn:hover {
+    /* Override background for close button, and set specific text color */
     background-color: rgba(var(--m3-error-r, 242), var(--m3-error-g, 184), var(--m3-error-b, 181), var(--m3-state-hover-error-opacity));
-    /* background-color: rgba(242, 184, 181, 0.08); */
     color: var(--m3-error);
 }
 .debug-menu-content {
@@ -638,11 +637,8 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
   mask-position: center;
-  -webkit-mask-mode: alpha;
+  -webkit-mask-mode: alpha; /* canvas selector now handles common image-rendering */
   mask-mode: alpha;
-  image-rendering: pixelated; /* Modern browsers */
-  image-rendering: -moz-crisp-edges; /* Firefox */
-  image-rendering: crisp-edges; /* Older spec, still useful for some browsers */
   background-blend-mode: multiply; /* Blend the texture with the background color */
 }
 
