@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let firstLastFmFetchAttempted = false; // Flag to ensure first API call is made before defaulting
     let lastFmArtProcessing = false; // Flag to indicate if Last.fm album art is currently being processed
     const REINIT_BATCH_DIVISOR = 30; // Process 1/30th of shapes per frame for re-initialization
-    const DEFAULT_IMAGE_URL = '/assets/bgimg/newsquare7_512.png'; // Path to your default image
+    const DEFAULT_IMAGE_URL = '/assets/bgimg/achtsquare_512.png'; // Path to your default image
     let previousFrameAnimatedBgColor = '#121212'; // Initialize with a default or the initial background
     let defaultBackgroundColor = '#121212'; // Will be updated from default image
     let defaultColorsLoaded = false; 
@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const RAIN_CAKE_MAX_SPEED = 0.24;  // pixels per ms (doubled from 0.12)
     const RAIN_CAKE_WIDTH = 60; // px, must match CSS
     const RAIN_CAKE_HEIGHT = 80; // px, must match CSS
-    const OLD_MENU_FAVICON_BASE_SRC = '/assets/favicon/newsquare7_128trans.png';
+    const OLD_MENU_FAVICON_BASE_SRC = '/assets/favicon/achtsquare_trans_128.png';
 
     // --- Birthday Mode Variables ---
     function isJuly5th() { // Renamed for clarity
