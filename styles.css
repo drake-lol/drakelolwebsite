@@ -86,7 +86,6 @@ canvas, .small-cake-layer { /* Combined image-rendering */
     left: 20px;
     background-color: var(--m3-surface);
     color: var(--m3-on-surface);
-    border: 1px solid var(--m3-outline);
     border-radius: 16px; /* M3 Medium Shape */
     font-size: 14px; /* M3 Body Medium */
     z-index: 100; 
@@ -112,13 +111,12 @@ canvas, .small-cake-layer { /* Combined image-rendering */
     font-size: 16px; /* M3 Title Small */
     font-weight: 500; 
     cursor: grab; /* Make the entire title bar draggable */
-    border-bottom: 1px solid var(--m3-outline);
     display: flex;
     justify-content: space-between;
     align-items: center;
     user-select: none; 
-    border-top-left-radius: calc(16px - 1px); /* Match parent border-radius */
-    border-top-right-radius: calc(16px - 1px);
+    border-top-left-radius: 16px; /* Match parent border-radius */
+    border-top-right-radius: 16px;
     flex-shrink: 0; 
 }
 .title-text-drag-area { 
