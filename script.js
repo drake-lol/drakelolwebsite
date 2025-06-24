@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentRotationSpeedMultiplier = 1.0;
     let currentMovementSpeedMultiplier = 1.0;
     let currentNumTransitionShapes = 10; // Default, will be synced with slider
-    let currentBlurIntensity = 200; // Default blur intensity scaled for 64x64 canvas (was 200px for 512x512)
+    let currentBlurIntensity = 300; // Default blur intensity set to max
 
     // Define available resolutions
     const RESOLUTIONS = [
@@ -921,11 +921,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Calculate max blur per layer in pixels based on viewport
             const calculatedMaxBlurPerLayerPx = MAX_BLUR_PER_LAYER_VW * viewportMinDim / 100;
 
-            // Scale blurLayer1 to provide an oversized area, preventing hard edges from blur.
-            blurLayer1.style.width = '104%';
-            blurLayer1.style.height = '104%';
-            blurLayer1.style.top = '-2%'; // Adjust to keep it centered
-            blurLayer1.style.left = '-2%'; // Adjust to keep it centered
+            // To prevent the vignette/dark-edge effect from the blur, we need to make the
+            // blurred container larger than the viewport. The required extra size (bleed)
+            // is proportional to the blur radius. A bleed of 2 * blurRadius is a good starting point.
+            const bleedPx = Math.ceil(effectiveTotalBlurPx * 2);
+
+            // Scale blurLayer1 using calc() to add the bleed area around the 100% viewport size.
+            blurLayer1.style.width = `calc(100% + ${bleedPx * 2}px)`;
+            blurLayer1.style.height = `calc(100% + ${bleedPx * 2}px)`;
+            blurLayer1.style.top = `-${bleedPx}px`;
+            blurLayer1.style.left = `-${bleedPx}px`;
 
             let remainingBlur = effectiveTotalBlurPx;
             let currentParentForNextLayer = blurLayer1;
