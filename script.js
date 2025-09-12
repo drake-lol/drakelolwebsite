@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isOverlayEnabled = true; // On by default
 
     let rawUnbalancedPalette = []; // To store the palette before balancing
-let currentDominanceCap = 50;
+let currentDominanceCap = 35;
 let currentAccentBoost = 0.5;
     
     // Maximum number of colors to request from ColorThief for the palette.
