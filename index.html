@@ -39,133 +39,139 @@
         <a class="b" href="https://www.instagram.com/drake_llol">instagram</a>
         <a class="b" href="https://steamcommunity.com/id/drake_lol">steam</a>
         <a class="b" href="https://www.roblox.com/users/76034569">roblox</a>
-        <a class="b" id="lastfm-button">Last.fm</a> <!-- This is the button JS will target -->
-    </div>
+        <a class="b" id="lastfm-button">Last.fm</a> </div>
     <div class="corner-image-container">
         <img src="/assets/bgimg/achtsquare_512.png" alt="Corner Image" class="corner-image">
     </div>
 
-    <!-- Raining Cakes Container -->
     <div id="raining-cakes-container"></div>
     <div id="scene-container">
         <div id="blur-layer-1" class="blur-layer">
-            <!-- canvas-host is now the direct child for simplified blur -->
-            <div id="canvas-host" class="blur-layer"> <!-- Canvas will be appended here -->
-            </div>
+            <div id="canvas-host" class="blur-layer"> </div>
         </div>
     </div>
     <div id="debug-menu" class="menu-hidden collapsed"> 
-        <div id="debug-menu-title">
-            <div class="title-text-drag-area"> <span>Debug Menu</span></div>
-            <div class="title-buttons-wrapper"> 
-                <span class="window-control-button" id="debug-menu-collapse-btn">
-                    <span class="toggle-icon">▼</span> 
-                </span>
-                <span class="window-control-button" id="debug-menu-close-btn">✕</span> 
-            </div>
-        </div>
-        <div class="debug-menu-content">
-            <div class="subsection-title">Scene</div> 
-            <div>Shapes: <span id="on-screen-shape-count">0</span></div> 
-            <div>Transition Shapes: <span id="on-screen-transition-shape-count">0</span></div>
-            <div>FPS: <span id="fps-counter">0</span></div>
-            <div class="control-group" id="birthday-mode-control-group" style="display: none;">
-                <input type="checkbox" id="birthday-mode-toggle">
-                <label for="birthday-mode-toggle">Birthday Mode</label>
-            </div>
-            <div class="control-group">
-                <!-- Replaced checkbox with a slider for resolution -->
-                <label for="resolution-slider" class="slider-label">Resolution: <span id="resolution-value">16x16</span></label>
-                <input type="range" id="resolution-slider" min="0" max="4" value="2" step="1"> <!-- Min/Max will be set by JS based on available resolutions, default value set to 2 (64x64) -->
-            </div>
-            <div class="control-group">
-                <input type="checkbox" id="blur-toggle" checked>
-                <label for="blur-toggle">Canvas Blur</label>
-            </div>
-            <div class="control-group">
-                <label for="blur-intensity-slider" class="slider-label">Intensity: <span id="blur-intensity-value">300</span>px</label> <!-- Initial text updated, JS will calculate precise value -->
-                <input type="range" id="blur-intensity-slider" min="0" max="300" value="300" step="5"> <!-- Default slider value set to 300 -->
-            </div>
-            <div class="control-group">
-                <button id="pause-resume-btn">Pause Animation</button>
-            </div>
-            
-            <div class="subsection-title">Post-processing</div>
-            <div class="control-group">
-                <label for="brightness-slider" class="slider-label">Brightness: <span id="brightness-value">100</span>%</label>
-                <input type="range" id="brightness-slider" min="0" max="200" value="100" step="5">
-            </div>
-            <div class="control-group">
-                <label for="contrast-slider" class="slider-label">Contrast: <span id="contrast-value">100</span>%</label>
-                <input type="range" id="contrast-slider" min="0" max="200" value="100" step="5">
-            </div>
-            <div class="control-group">
-                <label for="saturation-slider" class="slider-label">Saturation: <span id="saturation-value">100</span>%</label>
-                <input type="range" id="saturation-slider" min="0" max="400" value="100" step="5">
-            </div>
-            <div class="control-group">
-                <label for="hue-rotate-slider" class="slider-label">Hue Rotate: <span id="hue-rotate-value">0</span>deg</label>
-                <input type="range" id="hue-rotate-slider" min="0" max="360" value="0" step="5">
-            </div>
-
-            <div class="subsection-title">Shape</div> 
-            <div class="control-group">
-                <label for="num-shapes-slider" class="slider-label">Number of Shapes: <span id="num-shapes-value">60</span></label>
-                <input type="range" id="num-shapes-slider" min="0" max="150" value="60"> 
-            </div>
-            <div class="control-group">
-                <label for="num-transition-shapes-slider" class="slider-label">Transition Shapes: <span id="num-transition-shapes-value">10</span></label>
-                <input type="range" id="num-transition-shapes-slider" min="0" max="50" value="10">
-            </div>
-            <div class="control-group">
-                <label for="scale-slider" class="slider-label">Scale Multiplier: <span id="scale-value">1.0</span>x</label>
-                <input type="range" id="scale-slider" min="0.2" max="2.5" value="1.0" step="0.1">
-            </div>
-            <div class="control-group">
-                <label for="speed-slider" class="slider-label">Movement Speed: <span id="speed-value">1.0</span>x</label>
-                <input type="range" id="speed-slider" min="0.1" max="3" value="1.0" step="0.1">
-            </div>
-            <div class="control-group">
-                <label for="rotation-slider" class="slider-label">Rotation Speed: <span id="rotation-value">1.0</span>x</label>
-                <input type="range" id="rotation-slider" min="0" max="5" value="1.0" step="0.1">
-            </div>
-            <div class="control-group"> 
-                <button id="delete-all-shapes-btn">Delete All Shapes</button>
-            </div>
-
-            <div class="subsection-title">Color Palette</div>
-            <div id="color-palette-controls">
-                </div>
-            <div class="color-input-group" id="background-color-control-group">
-                <label for="background-color-picker">Background:</label>
-                <input type="color" id="background-color-picker">
-            </div>
-
-            <div class="subsection-title">Last.fm</div>
-            <div id="lastfm-status-container">
-                <div id="lastfm-loading" style="display: none;">Loading Last.fm data...</div>
-                <div id="lastfm-error" style="display: none; color: #ff8080;">Error fetching Last.fm data.</div>
-                <div id="lastfm-nowplaying">
-                    <div class="lastfm-art-and-info">
-                        <div class="album-art-container"> <!-- Wrapper for art and BPM -->
-                            <img id="lastfm-album-art" src="" alt="Album Art" style="width: 50px; height: 50px; border-radius: 4px; display: none;">
-                            <!-- BPM display removed -->
-                        </div>
-                        <div class="lastfm-text-details">
-                            <div id="lastfm-track">-</div>
-                            <div id="lastfm-artist">-</div>
-                            <div id="lastfm-album">-</div>
-                        </div>
-                    </div>
-                </div>
-                <div id="lastfm-notplaying" style="display: none; color: #A0A0A0;">Not currently playing.</div>
-            </div>
-            <div> <!-- Added a div wrapper for the button to ensure proper spacing if other elements are added later -->
-                <button id="fetch-lastfm-btn">Fetch new data</button>
-            </div>
+    <div id="debug-menu-title">
+        <div class="title-text-drag-area"> <span>Debug Menu</span></div>
+        <div class="title-buttons-wrapper"> 
+            <span class="window-control-button" id="debug-menu-collapse-btn">
+                <span class="toggle-icon">▼</span> 
+            </span>
+            <span class="window-control-button" id="debug-menu-close-btn">✕</span> 
         </div>
     </div>
-    <!-- Scripts moved to the end of body and deferred for non-blocking loading -->
+    <div class="debug-menu-content">
+        <div class="subsection-title">Scene</div> 
+        <div>Shapes: <span id="on-screen-shape-count">0</span></div> 
+        <div>Transition Shapes: <span id="on-screen-transition-shape-count">0</span></div>
+        <div>FPS: <span id="fps-counter">0</span></div>
+        <div class="control-group" id="birthday-mode-control-group" style="display: none;">
+            <input type="checkbox" id="birthday-mode-toggle">
+            <label for="birthday-mode-toggle">Birthday Mode</label>
+        </div>
+        <div class="control-group">
+            <label for="resolution-slider" class="slider-label">Resolution: <span id="resolution-value">16x16</span></label>
+            <input type="range" id="resolution-slider" min="0" max="4" value="2" step="1">
+        </div>
+        <div class="control-group">
+            <input type="checkbox" id="blur-toggle" checked>
+            <label for="blur-toggle">Canvas Blur</label>
+        </div>
+        <div class="control-group">
+            <label for="blur-intensity-slider" class="slider-label">Intensity: <span id="blur-intensity-value">300</span>px</label>
+            <input type="range" id="blur-intensity-slider" min="0" max="300" value="300" step="5">
+        </div>
+        <div class="control-group">
+    <input type="checkbox" id="overlay-toggle" checked>
+    <label for="overlay-toggle">Darkness Overlay</label>
+</div>
+        <div class="control-group">
+            <button id="pause-resume-btn">Pause Animation</button>
+        </div>
+        
+        <div class="subsection-title">Post-processing</div>
+        <div class="control-group">
+            <label for="brightness-slider" class="slider-label">Brightness: <span id="brightness-value">100</span>%</label>
+            <input type="range" id="brightness-slider" min="0" max="200" value="100" step="5">
+        </div>
+        <div class="control-group">
+            <label for="contrast-slider" class="slider-label">Contrast: <span id="contrast-value">100</span>%</label>
+            <input type="range" id="contrast-slider" min="0" max="200" value="100" step="5">
+        </div>
+        <div class="control-group">
+            <label for="saturation-slider" class="slider-label">Saturation: <span id="saturation-value">100</span>%</label>
+            <input type="range" id="saturation-slider" min="0" max="400" value="100" step="5">
+        </div>
+        <div class="control-group">
+            <label for="hue-rotate-slider" class="slider-label">Hue Rotate: <span id="hue-rotate-value">0</span>deg</label>
+            <input type="range" id="hue-rotate-slider" min="0" max="360" value="0" step="5">
+        </div>
+
+        <div class="subsection-title">Shape</div> 
+        <div class="control-group">
+            <label for="num-shapes-slider" class="slider-label">Number of Shapes: <span id="num-shapes-value">60</span></label>
+            <input type="range" id="num-shapes-slider" min="0" max="150" value="60"> 
+        </div>
+        <div class="control-group">
+            <label for="num-transition-shapes-slider" class="slider-label">Transition Shapes: <span id="num-transition-shapes-value">10</span></label>
+            <input type="range" id="num-transition-shapes-slider" min="0" max="50" value="10">
+        </div>
+        <div class="control-group">
+            <label for="scale-slider" class="slider-label">Scale Multiplier: <span id="scale-value">1.0</span>x</label>
+            <input type="range" id="scale-slider" min="0.2" max="2.5" value="1.0" step="0.1">
+        </div>
+        <div class="control-group">
+            <label for="speed-slider" class="slider-label">Movement Speed: <span id="speed-value">1.0</span>x</label>
+            <input type="range" id="speed-slider" min="0.1" max="3" value="1.0" step="0.1">
+        </div>
+        <div class="control-group">
+            <label for="rotation-slider" class="slider-label">Rotation Speed: <span id="rotation-value">1.0</span>x</label>
+            <input type="range" id="rotation-slider" min="0" max="5" value="1.0" step="0.1">
+        </div>
+        <div class="control-group"> 
+            <button id="delete-all-shapes-btn">Delete All Shapes</button>
+        </div>
+
+<div class="subsection-title">Color Palette</div>
+<div id="color-palette-controls">
+    </div>
+<div class="color-input-group" id="background-color-control-group">
+    <label for="background-color-picker">Background:</label>
+    <input type="color" id="background-color-picker">
+</div>
+
+<div class="subsection-title">Palette Options</div>
+<div class="control-group">
+    <label for="dominance-cap-slider" class="slider-label">Dominance Cap: <span id="dominance-cap-value">50</span>%</label>
+    <input type="range" id="dominance-cap-slider" min="25" max="100" value="50" step="1">
+</div>
+<div class="control-group">
+    <label for="accent-boost-slider" class="slider-label">Accent Boost: <span id="accent-boost-value">5.0</span>%</label>
+    <input type="range" id="accent-boost-slider" min="0" max="25" value="5" step="0.5">
+</div>
+        <div class="subsection-title">Last.fm</div>
+        <div id="lastfm-status-container">
+            <div id="lastfm-loading" style="display: none;">Loading Last.fm data...</div>
+            <div id="lastfm-error" style="display: none; color: #ff8080;">Error fetching Last.fm data.</div>
+            <div id="lastfm-nowplaying">
+                <div class="lastfm-art-and-info">
+                    <div class="album-art-container">
+                        <img id="lastfm-album-art" src="" alt="Album Art" style="width: 50px; height: 50px; border-radius: 4px; display: none;">
+                    </div>
+                    <div class="lastfm-text-details">
+                        <div id="lastfm-track">-</div>
+                        <div id="lastfm-artist">-</div>
+                        <div id="lastfm-album">-</div>
+                    </div>
+                </div>
+            </div>
+            <div id="lastfm-notplaying" style="display: none; color: #A0A0A0;">Not currently playing.</div>
+        </div>
+        <div>
+            <button id="fetch-lastfm-btn">Fetch new data</button>
+        </div>
+    </div>
+</div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/two.js/0.8.12/two.min.js" defer></script>
     <script src="script.js" defer></script>

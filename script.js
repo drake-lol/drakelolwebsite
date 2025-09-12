@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const debugMenuContent = debugMenu ? debugMenu.querySelector('.debug-menu-content') : null;
     const birthdayModeControlGroup = document.getElementById('birthday-mode-control-group');
     const birthdayModeToggle = document.getElementById('birthday-mode-toggle');
+    const overlayToggle = document.getElementById('overlay-toggle');
     const pauseResumeBtn = document.getElementById('pause-resume-btn');
     const deleteAllShapesBtn = document.getElementById('delete-all-shapes-btn'); 
     const colorPaletteControlsContainer = document.getElementById('color-palette-controls');
@@ -29,6 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const scaleValueDisplay = document.getElementById('scale-value');
     const rotationSlider = document.getElementById('rotation-slider');
     const rotationValueDisplay = document.getElementById('rotation-value');
+    const dominanceCapSlider = document.getElementById('dominance-cap-slider');
+    const dominanceCapValue = document.getElementById('dominance-cap-value');
+    const accentBoostSlider = document.getElementById('accent-boost-slider');
+    const accentBoostValue = document.getElementById('accent-boost-value');
     const speedSlider = document.getElementById('speed-slider');
     const speedValueDisplay = document.getElementById('speed-value');
     // New UI Elements for Resolution Slider
@@ -100,6 +105,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentContrast = 120;   // %
     let currentSaturation = 200; // %
     let currentHueRotate = 0;    // deg
+
+    let isOverlayEnabled = true; // On by default
+
+    let rawUnbalancedPalette = []; // To store the palette before balancing
+let currentDominanceCap = 50;
+let currentAccentBoost = 0.5;
     
     // Maximum number of colors to request from ColorThief for the palette.
     const MAX_PALETTE_COLORS_TO_REQUEST = 8; // You can adjust this value
@@ -230,6 +241,42 @@ document.addEventListener('DOMContentLoaded', () => {
         return { h: h * 360, s: s, l: l }; // h in degrees 0-360, s/l in 0-1
     }
 
+    function rebalanceAndApplyPalette() {
+    if (rawUnbalancedPalette.length === 0) return;
+
+    // Use the global slider values to balance the raw palette
+    const balancedPalette = normalizeAndCapWeights(rawUnbalancedPalette, currentDominanceCap, currentAccentBoost);
+    
+    // Update the global palette and redraw the UI with the new percentages
+    colorPalette = balancedPalette; 
+    initializeColorPaletteUI(); 
+}
+
+/**
+ * Finds the closest color in a palette to a given pixel color.
+ * @param {number[]} pixelRgb - The [r, g, b] of the pixel.
+ * @param {number[][]} paletteRgb - An array of [r, g, b] palette colors.
+ * @returns {number} The index of the closest color in the palette.
+ */
+function findClosestColorIndex(pixelRgb, paletteRgb) {
+    let minDistanceSq = Infinity;
+    let closestIndex = 0;
+
+    for (let i = 0; i < paletteRgb.length; i++) {
+        const paletteColor = paletteRgb[i];
+        const distanceSq = 
+            Math.pow(pixelRgb[0] - paletteColor[0], 2) +
+            Math.pow(pixelRgb[1] - paletteColor[1], 2) +
+            Math.pow(pixelRgb[2] - paletteColor[2], 2);
+        
+        if (distanceSq < minDistanceSq) {
+            minDistanceSq = distanceSq;
+            closestIndex = i;
+        }
+    }
+    return closestIndex;
+}
+
     function hslToHex(h, s, l) {
         let r, g, b;
         h /= 360; // Convert h to 0-1 range
@@ -325,6 +372,51 @@ document.addEventListener('DOMContentLoaded', () => {
         return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     }
 
+/**
+ * Balances a color palette by boosting accents and capping dominant colors.
+ * @param {Array} palette - The palette to balance, with {color, weight, isAccent} objects.
+ * @param {number} cap - The maximum percentage for the dominant color.
+ * @param {number} boost - The minimum percentage for an accent color.
+ * @returns {Array} The balanced palette.
+ */
+function normalizeAndCapWeights(palette, cap = 50, boost = 5) {
+    let newPalette = JSON.parse(JSON.stringify(palette)); // Work on a copy
+
+    // 1. Boost accent color if its weight is too low
+    const accent = newPalette.find(c => c.isAccent);
+    if (accent && accent.weight < boost) {
+        accent.weight = boost;
+    }
+
+    // 2. Re-normalize all weights so they sum to 100 after the potential boost
+    let totalWeight = newPalette.reduce((sum, c) => sum + c.weight, 0);
+    if (totalWeight > 0) {
+        newPalette.forEach(c => c.weight = (c.weight / totalWeight) * 100);
+    }
+    
+    // 3. Cap the most dominant color and correctly redistribute the excess
+    newPalette.sort((a, b) => b.weight - a.weight);
+
+    if (newPalette.length > 1 && newPalette[0].weight > cap) {
+        const excess = newPalette[0].weight - cap;
+        newPalette[0].weight = cap;
+
+        let subTotalWeight = 0;
+        for (let i = 1; i < newPalette.length; i++) {
+            subTotalWeight += newPalette[i].weight;
+        }
+
+        if (subTotalWeight > 0) {
+            for (let i = 1; i < newPalette.length; i++) {
+                const proportion = newPalette[i].weight / subTotalWeight;
+                newPalette[i].weight += excess * proportion;
+            }
+        }
+    }
+    
+    return newPalette;
+}
+
     /**
      * Adds or removes a class from the scene container based on background luminance
      * and/or palette color luminances to toggle a dimming overlay.
@@ -332,6 +424,11 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function updateBackgroundOverlayState(backgroundColorHex) {
         if (!container) return; // container is #scene-container
+
+if (!isOverlayEnabled) {
+        container.classList.remove('light-bg');
+        return; // Exit the function if the overlay is disabled
+    }
 
         let activateOverlay = false;
 
@@ -802,6 +899,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize UI values
     numShapesSlider.value = currentNumShapes;
     numShapesValueDisplay.textContent = currentNumShapes;
+    dominanceCapSlider.value = currentDominanceCap;
+dominanceCapValue.textContent = currentDominanceCap;
+accentBoostSlider.value = currentAccentBoost;
+accentBoostValue.textContent = currentAccentBoost.toFixed(1);
+if (overlayToggle) overlayToggle.checked = isOverlayEnabled;
     scaleSlider.value = currentScaleMultiplier;
     scaleValueDisplay.textContent = currentScaleMultiplier.toFixed(1);
     rotationSlider.value = currentRotationSpeedMultiplier;
@@ -818,6 +920,15 @@ document.addEventListener('DOMContentLoaded', () => {
     } 
     if (blurIntensitySlider) blurIntensitySlider.value = currentBlurIntensity;
     updateBlurIntensityDisplay(); // Set initial display for blur intensity
+
+// Add with your other event listeners
+if (overlayToggle) {
+    overlayToggle.addEventListener('change', (e) => {
+        isOverlayEnabled = e.target.checked;
+        // Re-run the check to immediately apply the change
+        updateBackgroundOverlayState(currentAnimatedBackgroundColor);
+    });
+}
 
     brightnessSlider.value = currentBrightness;
     brightnessValueDisplay.textContent = currentBrightness;
@@ -981,6 +1092,17 @@ document.addEventListener('DOMContentLoaded', () => {
         updateBlurIntensityDisplay(); // Update the displayed value
         applyBlurEffect(currentAnimatedBackgroundColor); 
     });
+    dominanceCapSlider.addEventListener('input', (e) => {
+    currentDominanceCap = parseInt(e.target.value);
+    dominanceCapValue.textContent = currentDominanceCap;
+    rebalanceAndApplyPalette();
+});
+
+accentBoostSlider.addEventListener('input', (e) => {
+    currentAccentBoost = parseFloat(e.target.value);
+    accentBoostValue.textContent = currentAccentBoost.toFixed(1);
+    rebalanceAndApplyPalette();
+});
     // Ensure numTransitionShapesSlider event listener is here if it wasn't before or was misplaced
     if (resolutionSlider) {
         resolutionSlider.min = 0;
@@ -2190,109 +2312,123 @@ function performInitialSceneSetupIfNeeded() {
 
 }
 
-async function extractAndApplyColorsFromAlbumArt(imageUrl) {
-    if (!imageUrl || !colorThief) return;
-    lastFmColorsExtractedSuccessfully = false; // Assume failure until success
-    lastFmArtProcessing = true; // Indicate that art processing has started
+function extractAndApplyColorsFromAlbumArt(imageUrl) {
+    if (!imageUrl) return;
+    lastFmArtProcessing = true;
 
     const img = new Image();
-    img.crossOrigin = "Anonymous"; // Important for ColorThief
-    img.src = imageUrl;
+    img.crossOrigin = 'Anonymous';
 
-    let tempColorPaletteHolder = []; // To hold colors during extraction
     img.onload = () => {
         try {
+            // == STEP 1: DOWNSCALE IMAGE FOR PERFORMANCE ==
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const MAX_SIZE = 150;
+            
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+                if (width > MAX_SIZE) {
+                    height = Math.round(height * (MAX_SIZE / width));
+                    width = MAX_SIZE;
+                }
+            } else {
+                if (height > MAX_SIZE) {
+                    width = Math.round(width * (MAX_SIZE / height));
+                    height = MAX_SIZE;
+                }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // == STEP 2: GET DOMINANT COLORS & SCAN FOR ACCENTS ==
             const dominantColorRgb = colorThief.getColor(img);
-            const paletteRgb = colorThief.getPalette(img, MAX_PALETTE_COLORS_TO_REQUEST);
+            let paletteRgb = colorThief.getPalette(img, MAX_PALETTE_COLORS_TO_REQUEST - 1);
+            let accentRgb = null;
+            const pixelData = ctx.getImageData(0, 0, width, height).data;
+            const VIBRANT_SATURATION_THRESHOLD = 0.6;
+            const vibrantPixelCounts = new Map();
+
+            for (let i = 0; i < pixelData.length; i += 4) {
+                const r = pixelData[i], g = pixelData[i + 1], b = pixelData[i + 2];
+                const hsl = hexToHSL(rgbToHex(r, g, b));
+                if (hsl.s > VIBRANT_SATURATION_THRESHOLD && hsl.l > 0.15 && hsl.l < 0.85) {
+                    const hex = rgbToHex(r, g, b);
+                    vibrantPixelCounts.set(hex, (vibrantPixelCounts.get(hex) || 0) + 1);
+                }
+            }
+
+            if (vibrantPixelCounts.size > 0) {
+                const mostVibrantHex = [...vibrantPixelCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+                const rgb = hexToRgb(mostVibrantHex);
+                accentRgb = [rgb.r, rgb.g, rgb.b];
+                const isTooSimilar = paletteRgb.some(color => areColorsSimilar(color, accentRgb, 60));
+                if (!isTooSimilar) {
+                    paletteRgb.push(accentRgb);
+                }
+            }
+
+            if (!paletteRgb || paletteRgb.length === 0) throw new Error('ColorThief could not generate a palette.');
+
+            // == STEP 3: CALCULATE PERCENTAGES FOR THE COMBINED PALETTE ==
+            const colorCounts = new Array(paletteRgb.length).fill(0);
+            for (let i = 0; i < pixelData.length; i += 4) {
+                const pixelRgb = [pixelData[i], pixelData[i + 1], pixelData[i + 2]];
+                const closestIndex = findClosestColorIndex(pixelRgb, paletteRgb);
+                colorCounts[closestIndex]++;
+            }
+
+            // == STEP 4: BUILD, BALANCE, AND APPLY THE FINAL PALETTE ==
+            const totalPixels = width * height;
+            let initialPalette = paletteRgb.map((rgb, index) => {
+                const isAccent = accentRgb && rgb.every((val, i) => val === accentRgb[i]);
+                return {
+                    color: rgbToHex(rgb[0], rgb[1], rgb[2]).toUpperCase(),
+                    weight: (colorCounts[index] / totalPixels) * 100,
+                    isAccent: isAccent
+                };
+            });
+            
+            rawUnbalancedPalette = initialPalette;
+            rebalanceAndApplyPalette(); // This correctly sets the global colorPalette
 
             previousBackgroundColorForTransition = currentAnimatedBackgroundColor;
             targetBackgroundColor = rgbToHex(dominantColorRgb[0], dominantColorRgb[1], dominantColorRgb[2]).toUpperCase();
+            
+            // NOTE: The old, incorrect line "colorPalette = balancedPalette;" has been removed from here.
+
             backgroundColorTransitionStartTime = performance.now();
             isBackgroundTransitioning = true;
+            scheduleOldColorCleanup();
             
-            scheduleOldColorCleanup(); // Schedule cleanup before changing the palette
-
-            let uniquePaletteRgb = [];
-            if (paletteRgb && paletteRgb.length > 0) {
-                for (const candidateRgb of paletteRgb) {
-                    let isUnique = true;
-                    for (const existingRgb of uniquePaletteRgb) {
-                        if (areColorsSimilar(candidateRgb, existingRgb, COLOR_SIMILARITY_TOLERANCE)) {
-                            isUnique = false;
-                            break;
-                        }
-                    }
-                    if (isUnique) {
-                        uniquePaletteRgb.push(candidateRgb);
-                    }
-                }
-            }
-
-            tempColorPaletteHolder = []; // Initialize to hold {color, weight} objects
-            if (uniquePaletteRgb.length > 0) {
-                const numUniqueColors = uniquePaletteRgb.length;
-                uniquePaletteRgb.forEach((rgb, index) => {
-                    tempColorPaletteHolder.push({
-                        color: rgbToHex(rgb[0], rgb[1], rgb[2]).toUpperCase(),
-                        weight: Math.sqrt(numUniqueColors - index) // Weight based on sqrt of dominance order
-                    });
-                });
-            } else {
-                // Fallback if no unique colors are found after filtering,
-                // or if ColorThief initially returned no palette.
-                let fallbackHex = '#CCCCCC';
-                if (targetBackgroundColor) { // Use dominant color as the primary fallback
-                    fallbackHex = targetBackgroundColor;
-                } else if (paletteRgb && paletteRgb.length > 0) { // If dominant failed but original palette had something
-                    fallbackHex = rgbToHex(paletteRgb[0][0], paletteRgb[0][1], paletteRgb[0][2]).toUpperCase();
-                }
-                tempColorPaletteHolder.push({ color: fallbackHex, weight: 1 });
-            }
-            colorPalette = tempColorPaletteHolder; // Assign the new dynamic palette
-
-            console.log(`Extracted ${colorPalette.length} colors from album art.`); // Log the number of colors
-            if (backgroundColorPicker) {
-                backgroundColorPicker.value = targetBackgroundColor;
-            }
-            
-            // Ensure M3 themes and cakes are updated with the new palette structure
+            console.log(`Extracted ${colorPalette.length} colors (including accent scan).`);
+            if (backgroundColorPicker) backgroundColorPicker.value = targetBackgroundColor;
             updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
+            if (firstLastFmColorChangeDone) spawnTransitionShapes();
+            else firstLastFmColorChangeDone = true;
+            initializeColorPaletteUI();
+            lastFmColorsExtractedSuccessfully = true;
+            lastFmArtProcessing = false;
+            performInitialSceneSetupIfNeeded();
 
-            if (firstLastFmColorChangeDone) {
-                spawnTransitionShapes(); // Spawn only after the first successful color change
-            } else {
-                firstLastFmColorChangeDone = true; // Mark that the first color change has happened
-            }
-            updateDynamicM3ThemeColors(targetBackgroundColor, colorPalette);
-            initializeColorPaletteUI(); // Update palette UI with new colors
-
-            // applyBlurEffect will be handled by the animation loop for smooth transition
-
-            lastFmColorsExtractedSuccessfully = true; // Mark successful extraction
-            lastFmArtProcessing = false; // Art processing finished
-            // If this is the very first successful fetch with album art, ensure scene setup happens
-            performInitialSceneSetupIfNeeded(); 
-
-
-        } catch (e) {
-            console.error("Error processing image with ColorThief:", e);
-            // Fallback to default colors on ColorThief error
-            lastFmColorsExtractedSuccessfully = false; // Mark failure
-            lastFmArtProcessing = false; // Art processing finished (with error)
-            performInitialSceneSetupIfNeeded(); // Re-evaluate initial setup state
+        } catch (err) {
+            console.error("Error in hybrid color extraction:", err);
+            lastFmColorsExtractedSuccessfully = false;
+            lastFmArtProcessing = false;
+            applyDefaultColors();
+            performInitialSceneSetupIfNeeded();
         }
-
     };
+
     img.onerror = () => {
-        console.error("Failed to load album art image for color extraction:", imageUrl);
-        // Fallback to default colors on image load error
-        lastFmColorsExtractedSuccessfully = false; // Ensure flag is false
-        lastFmArtProcessing = false; // Art processing finished (with error)
-        // applyDefaultColors() will be called by updateLastFmUI or fetchLastFmData if this path leads to no art.
-        // The important part here is that lastFmArtProcessing is false so performInitialSceneSetupIfNeeded can proceed with defaults if ready.
-        performInitialSceneSetupIfNeeded(); // Re-evaluate initial setup state
-
+        console.error("Failed to load album art image:", imageUrl);
+        currentAlbumArtUrl = '';
+        applyDefaultColors();
     };
+
+    img.src = imageUrl;
 }
 
 // --- Initial Default Color Extraction ---
