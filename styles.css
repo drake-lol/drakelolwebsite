@@ -1,42 +1,24 @@
 :root {
   --s: 75px; /* For old menu positioning and sizing */
-
-  /* Material You 3 Dark Theme Inspired Colors for Debug Menu */
-  --m3-surface: #2B2930; /* Elevated surfaces like menus */
-  --m3-surface-container-high: #36343B; /* Slightly lighter, for elements like title bars */
-  --m3-on-surface: #E6E1E5; /* Text and icons on surface colors */
-  --m3-on-surface-variant: #CAC4D0; /* Less prominent text and icons */
-  --m3-primary: #D0BCFF; /* Key accent color for interactive elements */
-  --m3-on-primary: #381E72; /* Text/icons on primary color */
-  --m3-secondary-container: #4A4458; /* Tonal buttons, less emphasis than primary */
-  --m3-on-secondary-container: #E8DEF8; /* Text/icons on secondary container */
-  --m3-outline: #79747E; /* Borders and dividers */
-  --m3-error: #F2B8B5; /* Error text and icons */
-  --m3-error-container: #601410; /* Background for error elements */
-  --m3-on-error-container: #F9DEDC; /* Text/icons on error container */
-
-  /* State Layers (Opacity for hover/focus/pressed states) */
-  --m3-state-hover-on-surface-opacity: 0.08;
-  --m3-state-hover-on-secondary-container-opacity: 0.08;
-  --m3-state-hover-error-opacity: 0.08;
+  /* Removed Material You variables */
 }
 
 
 body {
     margin: 0;
-    overflow: hidden; 
-    background-color: #121212; 
+    overflow: hidden;
+    background-color: #121212;
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100vh; 
-    font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-    color: #EAEAEA;
+    min-height: 100vh;
+    font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #EAEAEA; /* Default text color, primarily for old menu */
 }
 #scene-container {
     width: 100vw;
     height: 100vh;
-    position: fixed; 
+    position: fixed;
     top: 0;
     left: 0;
     z-index: 0;
@@ -45,407 +27,37 @@ body {
 #scene-container.no-transition::before {
     transition: none !important;
 }
-.blur-layer { /* Style for the new blur wrapper divs */
+.blur-layer { /* Style for the blur wrapper divs */
     width: 100%;
     height: 100%;
-    position: absolute; /* Ensure they stack correctly and fill parent */
+    position: absolute;
     top: 0;
     left: 0;
 }
-/* Scale the outermost blur layer to provide bleed area for the blur effect */
 #blur-layer-1 {
-    /* Styles for scaling will be applied by JS if blur is active */
-    /* Default to 100% if not actively scaled by JS */
+    /* Styles for scaling applied by JS if blur is active */
     width: 100%; height: 100%;
     top: 0; left: 0;
 }
-/* Overlay for dimming light backgrounds/palettes for text readability */
-#scene-container::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0); /* Transparent by default */
-  z-index: 1; /* Ensures it's above blur layers/canvas within #scene-container */
-  pointer-events: none; /* Allows interactions with elements behind it */
-  transition: background-color 10s ease-in-out; /* Smooth transition for the dimming effect */
-}
-#scene-container.light-bg::before {
-  background-color: rgba(0, 0, 0, 0.3); /* Adjust opacity for desired dimming */
-}
+
+/* Removed overlay styles (#scene-container::before, #scene-container.light-bg::before) */
+
 canvas, .small-cake-layer { /* Combined image-rendering */
-    display: block; 
+    display: block;
     image-rendering: pixelated; /* Modern browsers */
     image-rendering: -moz-crisp-edges; /* Firefox */
-    image-rendering: crisp-edges; /* Older spec, still useful for some browsers */
-    /* Note: .small-cake-layer specific background-blend-mode is kept separate */
-}
-#debug-menu {
-    position: absolute;
-    /* Default position, will be restored by JS if needed */
-    top: 20px;
-    left: 20px;
-    background-color: var(--m3-surface);
-    color: var(--m3-on-surface);
-    border-radius: 16px; /* M3 Medium Shape */
-    font-size: 14px; /* M3 Body Medium */
-    z-index: 100; 
-    width: 300px; /* Set fixed width */
-    /* M3 Elevation Level 2 */
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15);
-    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
-    -webkit-backdrop-filter: blur(12px); 
-    backdrop-filter: blur(12px); 
-    max-height: 500px; 
-    display: flex; 
-    flex-direction: column; 
-    overflow-x: hidden; /* Prevent horizontal scrolling */
-}
-#debug-menu.menu-hidden {
-    opacity: 0;
-    transform: scale(0.98) translateY(-10px); /* Adjusted for a smoother feel */
-    pointer-events: none; 
-}
-#debug-menu-title {
-    background-color: var(--m3-surface-container-high);
-    padding: 8px 8px 8px 16px; /* Top: 8px, Right: 8px, Bottom: 8px, Left: 16px. Adjusted right padding for button spacing. */
-    font-size: 16px; /* M3 Title Small */
-    font-weight: 500; 
-    cursor: grab; /* Make the entire title bar draggable */
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    user-select: none; 
-    border-top-left-radius: 16px; /* Match parent border-radius */
-    border-top-right-radius: 16px;
-    flex-shrink: 0; 
-}
-.title-text-drag-area { 
-    flex-grow: 1;
-    /* cursor: grab; /* Moved to #debug-menu-title */
-    padding-right: 10px; 
-}
-#debug-menu.dragging #debug-menu-title { /* Apply grabbing cursor to the whole title bar when dragging */
-    cursor: grabbing; 
-}
-.title-buttons-wrapper {
-    display: flex;
-    align-items: center;
-}
-.window-control-button {
-    font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets', Arial, sans-serif;
-    font-size: 18px; /* Increased icon size */
-    font-weight: normal;
-    padding: 6px; /* Adjusted for better touch target */
-    cursor: pointer;
-    color: var(--m3-on-surface-variant);
-    border-radius: 50%; /* Circular buttons */
-    line-height: 1;
-    margin-left: 5px; 
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 32px; /* M3 touch target consideration */
-    min-height: 32px;
-    transition: background-color 0.2s ease;
-}
-#debug-menu-collapse-btn .toggle-icon {
-    font-size: 18px; /* Match button icon size */
-    transition: transform 0.2s ease-in-out;
-    color: var(--m3-on-surface-variant);
-}
-#debug-menu-collapse-btn {
-    display: none; /* Remove the minimize/collapse button */
-}
-#debug-menu.collapsed #debug-menu-collapse-btn .toggle-icon {
-    transform: rotate(-90deg);
-}
-.window-control-button:hover { /* Base hover for all window control buttons */
-    background-color: rgba(var(--m3-on-surface-r, 230), var(--m3-on-surface-g, 225), var(--m3-on-surface-b, 229), var(--m3-state-hover-on-surface-opacity));
-}
-#debug-menu-close-btn:hover {
-    /* Override background for close button, and set specific text color */
-    background-color: rgba(var(--m3-error-r, 242), var(--m3-error-g, 184), var(--m3-error-b, 181), var(--m3-state-hover-error-opacity));
-    color: var(--m3-error);
-}
-.debug-menu-content {
-    padding: 8px 16px 16px 16px; /* Adjusted padding */
-    transition: opacity 0.3s ease, max-height 0.3s ease, padding 0.3s ease;
-    opacity: 1;
-    overflow-y: auto;
-    overflow-x: hidden; /* Prevent horizontal scrolling within the content area */
-    flex-grow: 1;
-    font-size: 14px; /* M3 Body Medium for content */
-    scrollbar-width: none;  /* Firefox */
-    -ms-overflow-style: none;  /* IE and Edge */
-}
-.debug-menu-content::-webkit-scrollbar {
-    display: none; /* WebKit browsers */
-}
-#debug-menu.collapsed .debug-menu-content {
-    max-height: 0; 
-    opacity: 0;
-    padding-top: 0 !important; /* Ensure padding collapses */
-    padding-bottom: 0 !important;
-    overflow: hidden; 
-}
-.debug-menu-content div, .debug-menu-content .control-group {
-    margin-bottom: 10px; 
-}
-/* Remove margin from the last child in the content area to prevent extra spacing at the bottom */
-.debug-menu-content > *:last-child {
-    margin-bottom: 0;
-}
-.debug-menu-content label {
-    margin-left: 8px; 
-    display: inline-block; 
-    margin-bottom: 3px;
-    font-size: 12px; /* M3 Label Small */
-    color: var(--m3-on-surface-variant);
-    vertical-align: middle;
-}
- .debug-menu-content .slider-label, .debug-menu-content .color-label, .debug-menu-content .text-input-label {
-    display: block; 
-    margin-bottom: 4px;
-    font-size: 12px; /* M3 Label Small */
-    color: var(--m3-on-surface-variant);
-}
-.debug-menu-content input[type="checkbox"] {
-    vertical-align: middle;
-    width: 18px; 
-    height: 18px;
-    accent-color: var(--m3-primary); 
-    border-radius: 4px; /* Slightly rounded corners */
-}
-.debug-menu-content input[type="range"] {
-    width: calc(100% - 7px); 
-    margin-right: 5px;
-    vertical-align: middle;
-    accent-color: var(--m3-primary);
-    height: 20px; /* M3 sliders are a bit thicker */
-}
-.debug-menu-content input[type="color"] {
-    vertical-align: middle;
-    width: 32px; /* Adjusted size */
-    height: 24px;
-    border: 1px solid var(--m3-outline);
-    border-radius: 8px; /* More rounded */
-    padding: 0; /* Remove default padding if any */
-    margin-right: 5px;
-    cursor: pointer;
-}
-.debug-menu-content .slider-value {
-    display: inline-block;
-    width: 40px; 
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    font-size: 14px;
-    color: var(--m3-on-surface-variant);
-}
-.subsection-title {
-    font-weight: 500; /* M3 Medium weight */
-    font-size: 12px; /* M3 Label Small or Overline */
-    color: var(--m3-primary); /* Use primary color for emphasis */
-    text-transform: uppercase;
-    margin-top: 20px; 
-    margin-bottom: 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--m3-outline);
-}
-.debug-menu-content > .subsection-title:first-child {
-    margin-top: 0;
-}
-#pause-resume-btn {
-    background-color: var(--m3-secondary-container);
-    color: var(--m3-on-secondary-container);
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px; /* M3 Medium corner */
-    cursor: pointer;
-    text-align: center;
-    width: 100%;
-    box-sizing: border-box;
-    margin-top: 5px; 
-    font-size: 14px;
-    font-weight: 500;
-    transition: background-color 0.2s ease;
-}
-#fetch-lastfm-btn, #delete-all-shapes-btn { /* Group fetch and delete for common properties initially */
-    background-color: var(--m3-secondary-container);
-    color: var(--m3-on-secondary-container);
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    text-align: center;
-    width: 100%;
-    box-sizing: border-box;
-    font-size: 14px;
-    font-weight: 500;
-    transition: background-color 0.2s ease;
-}
-#fetch-lastfm-btn {
-    margin-top: 0; /* Specific margin for fetch button, ensures no space below status container */
-    /* Reverted: Height and flex centering removed to restore original button size */
-}
-#delete-all-shapes-btn {
-    margin-top: 5px; /* Specific margin for delete button */
-    background-color: var(--m3-error-container); /* Destructive action base color */
-    color: var(--m3-on-error-container);       /* Destructive action text color */
+    image-rendering: crisp-edges; /* Older spec */
 }
 
-#pause-resume-btn:hover, #fetch-lastfm-btn:hover {
-    background-color: color-mix(in srgb, var(--m3-on-secondary-container) calc(var(--m3-state-hover-on-secondary-container-opacity) * 100%), var(--m3-secondary-container));
-}
-
-#delete-all-shapes-btn:hover {
-    background-color: color-mix(in srgb, var(--m3-on-error-container) calc(var(--m3-state-hover-error-opacity) * 100%), var(--m3-error-container));
-    /* The color var(--m3-on-error-container) is inherited from the base style */
-}
-.color-input-group {
-    display: flex;
-    align-items: center;
-    margin-bottom: 5px;
-    width: 100%; /* Ensures the group takes the full available width */
-}
-
-/* The rule below might be too general if other labels within .color-input-group
-   (that are NOT .color-picker-label) still require a fixed width.
-   If all labels within .color-input-group are intended to be flexible like the
-   color palette ones, this rule could be removed or its 'width' property adjusted.
-   For now, it's overridden by the more specific rule for .color-picker-label.
-*/
-.color-input-group label {
-    width: 80px; 
-    margin-left: 0;
-}
-
-/* Specific styling for the dynamically created percentage/color name labels */
-.color-input-group label.color-picker-label {
-    flex-grow: 1; /* Allows the label to expand and take up available horizontal space */
-    width: auto; /* Overrides the fixed width from the general '.color-input-group label' rule */
-    margin-right: 8px; /* Adds a small space between the label and the color input box */
-    text-align: left; /* Ensures text is aligned to the left within its flexible space */
-}
-
-/* Ensure the color input itself doesn't shrink if space is tight */
-.color-input-group input[type="color"] {
-    flex-shrink: 0;
-}
-
-/* --- Styles for the Background Color Picker --- */
-/* Group containing the background color picker */
-.debug-menu-content div:has(> input#background-color-picker) {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    /* margin-bottom is typically inherited from .control-group or .debug-menu-content div */
-}
-
-/* Label for the background color picker (e.g., "Background Color:") */
-/* This targets a label associated with background-color-picker, likely having class "color-label" */
-.debug-menu-content div:has(> input#background-color-picker) > label[for="background-color-picker"] {
-    flex-grow: 1; /* Allow the label to expand */
-    width: auto;  /* Override any fixed width (e.g., from .color-input-group label if it were that) */
-    margin-left: 0; /* Override general .debug-menu-content label margin-left */
-    margin-right: 8px; /* Space between label and the color input */
-    text-align: left; /* Align text to the left */
-    /* Ensure display:block from .color-label doesn't interfere if present; flex item behavior takes precedence */
-    display: inline-block; /* Or simply let flex properties manage it */
-    vertical-align: middle; /* Consistent vertical alignment */
-    margin-bottom: 0; /* Remove bottom margin if it was set by .color-label or general label rules */
-}
-/* The input#background-color-picker itself will inherit general input[type="color"] styles,
-   and flex-shrink:0 is good if it were in a .color-input-group, but not strictly needed here as the label takes space. */
-
-/* Last.fm specific styling for cleaner text layout */
-.lastfm-text-details { /* New wrapper for text */
-    display: flex;
-    flex-direction: column;
-    justify-content: center; /* Vertically center the text lines within this container */
-    height: 50px; /* Match album art height for precise alignment */
-    flex-grow: 1;     /* Allow this container to take available horizontal space */
-    min-width: 0;     /* Important for flex items: allows shrinking below content size */
-    overflow: hidden; /* Clip overflowing content, helps child ellipsis to trigger */
-    max-width: 200px; /* Constrain the width of the text details block */
-    transform: translateY(0px); /* Shift text details up by 10px */
-}
-#lastfm-track {
-    font-weight: bold; 
-    line-height: 1.2;  /* Tighter line height */
-    margin-bottom: 2px; /* Small space between track and artist */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-#lastfm-artist {
-    font-size: 0.9em;  /* Moved from inline style */
-    color: #B0B0B0;   /* Moved from inline style */
-    line-height: 1.2;  /* Tighter line height */
-    margin-bottom: 2px; /* Small space between artist and album */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-#lastfm-album { /* Style for the album name */
-    font-size: 0.9em; /* Match artist font size */
-    color: #B0B0B0; /* Match artist color */
-    line-height: 1.2; /* Consistent line height */
-    margin-bottom: 2px;  /* Add consistent margin before the BPM line */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-/* #lastfm-bpm styles removed as the element is removed */
-
-#lastfm-album-art { /* Ensure consistent styling if not already fully inline */
-    border-radius: 4px; /* Was inline, good to keep in CSS if other styles are added */
-    /* vertical-align: middle; Removed as it's not effective for flex items; parent flex properties handle alignment */
-    /* width: 50px; height: 50px; are inline styles, controlled by JS if needed */
-    /* display: none; is an inline style, controlled by JS */
-}
-
-/* New wrapper for album art and BPM text, to stack them vertically */
-.album-art-container {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start; /* Aligns BPM text to the left, matching album art */
-    margin-right: 10px; /* Reduced margin to bring text details 5px closer */
-}
-#lastfm-status-container {
-    margin-top: 0;    /* Ensure no vertical space above this container from its own margin */
-    margin-bottom: -9px; /* Ensure no vertical space below this container */
-    height: 75px;     /* Restore fixed height as requested */
-    padding-top: 7px; /* Add padding to push content down */
-    display: flex;    /* Use flex to align its children */
-    align-items: center;/* Vertically center content (song details) within this container */
-}
-#lastfm-loading, #lastfm-error, #lastfm-notplaying { /* #lastfm-nowplaying has its own style now */
-    width: 100%; /* Ensure the active content takes full width */
-    text-align: center; /* Horizontally center the text content */
-}
-#lastfm-loading { /* Specific adjustment for loading text position */
-    transform: translateY(-10px);
-}
-#lastfm-nowplaying { /* Moved from inline style */
-    display: flex;
-    align-items: center;
-    width: 100%; /* Ensure it takes full width within its container */
-}
-.lastfm-art-and-info { /* New wrapper for album art and its text details */
-    display: flex;
-    align-items: center; /* Vertically center the album art and the text details block */
-}
+/* --- Removed all #debug-menu related styles --- */
 
 /* --- START: Styles for copied old menu --- */
 .signature-container {
   position: fixed;
   top: var(--s);
   left: var(--s);
-  z-index: 3; /* Ensure it's above the main scene but below debug menu if active */
-  font-family: Fustat, sans-serif; /* Apply Fustat font */
+  z-index: 3; /* Ensure it's above the main scene */
+  font-family: Fustat, sans-serif;
 }
 
 .signature {
@@ -453,51 +65,46 @@ canvas, .small-cake-layer { /* Combined image-rendering */
   width: auto;
   user-select: none;
   opacity: .8;
-  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3)); /* Subtle drop shadow for the signature SVG */
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
   pointer-events: none;
 }
 
-/* .cls-1 is defined in the SVG, but JS will override fill */
+/* .cls-1 defined in SVG, JS overrides fill */
 
 .b-c { /* Button container for old menu links */
-  position: fixed; /* Changed from default to fixed */
-  top: calc(2 * var(--s)); /* Position from top of viewport, aligned with signature bottom */
-  left: var(--s); /* Position from left of viewport */
-  right: 0; /* Extend to the right edge of the viewport */
+  position: fixed;
+  top: calc(2 * var(--s));
+  left: var(--s);
+  right: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  z-index: 3; /* Same as signature */
+  z-index: 3;
   gap: 0;
-  padding-top: 150px; /* Add blank space at the top, same as original offset */
-  /* max-width: 100%; /* Not strictly needed for fixed positioning unless content overflows */
-  max-height: calc(100vh - (2 * var(--s))); /* Max height for desktop, extends to bottom from its new top position */
-  overflow-y: auto; /* Allow vertical scrolling if content exceeds max-height */
-  /* Add mask to fade content at the top, appearing to scroll under the signature */
+  padding-top: 150px;
+  max-height: calc(100vh - (2 * var(--s)));
+  overflow-y: auto;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   box-sizing: border-box;
-  font-family: Fustat, sans-serif; /* Apply Fustat font */
-  /* Hide scrollbar for Firefox */
-  scrollbar-width: none;
-  /* Hide scrollbar for IE and Edge (older versions) */
-  -ms-overflow-style: none;
+  font-family: Fustat, sans-serif;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
 }
 
-/* Hide scrollbar for WebKit browsers */
 .b-c::-webkit-scrollbar {
-  display: none;
+  display: none; /* WebKit */
 }
 
 .b { /* Individual links in the old menu */
   opacity: .8;
   transition: opacity .3s, transform .3s, font-weight .3s;
-  font-size: var(--s); /* Set font size based on --s variable */
+  font-size: var(--s);
   cursor: pointer;
   transform-origin: left;
   text-align: left;
   text-decoration: none;
-  color: inherit; /* Will inherit body color, then JS will set it */
+  color: inherit; /* JS will set it */
   max-width: 80vw;
   box-sizing: border-box;
   padding: 0 10px;
@@ -505,9 +112,8 @@ canvas, .small-cake-layer { /* Combined image-rendering */
   user-select: none;
   -webkit-user-drag: none;
   pointer-events: auto;
-  font-weight: 300; 
-  text-shadow: 0 2px 10px rgba(0,0,0,0.3); /* Subtle drop shadow for menu button text */
-  /* mix-blend-mode: multiply; /* Removed: problematic on dark bg, makes links too dark/invisible */
+  font-weight: 300;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.3);
   position: relative;
 }
 
@@ -515,7 +121,7 @@ canvas, .small-cake-layer { /* Combined image-rendering */
   line-height: 1.5;
 }
 
-a.b[href*="roblox.com"] { /* Make selector more specific */
+a.b[href*="roblox.com"] {
   line-height: 2;
 }
 
@@ -525,57 +131,34 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
   font-weight: 700;
 }
 
-#lastfm-button { /* Specific style for the Last.fm button in the old menu */
+#lastfm-button { /* Specific style for the Last.fm button */
   word-wrap: break-word;
   white-space: normal;
 }
 
-.corner-image {
-  /* Positioning and sizing moved to the container */
-  display: block; /* Ensure it behaves as a block element */
-  width: 100%;    /* Fill the container */
-  height: 100%;   /* Fill the container */
-  border-radius: 8px;
-  user-select: none;
-  pointer-events: auto; /* Allow clicks/taps */
-}
-
-.corner-image-container { /* Added for positioning context */
-  position: fixed; /* Container is now fixed */
-  bottom: 12px;
-  right: 12px;
-  width: 32px;     /* Define size for the container */
-  height: 32px;    /* Define size for the container */
-  z-index: 3;      /* Container's z-index */
-  /* position: relative; is implicitly handled by fixed for absolute children */
-  /* The crown will be positioned relative to this fixed container */
-}
+/* --- Removed Corner Image Styles --- */
 
 /* Media Queries for the old menu elements */
 @media (max-width: 768px) {
   :root {
-      --s: 37.5px; /* 50% of desktop 75px */
-      /* font-size: 40px; /* This was global, might conflict. Old menu elements set their own font sizes or inherit. */
+      --s: 37.5px;
   }
 
   .signature-container {
       left: 50%;
       transform: translateX(-50%);
-      top: var(--s); /* Make signature visible and position it */
-      /* display: none; // Removed to make signature visible */
+      top: var(--s);
   }
 
   .b-c {
       flex-direction: column;
       align-items: center;
-      left: 0; /* Align to the left edge */
-      transform: none; /* Remove horizontal centering transform for the container */
-      bottom: 0; /* Extend to viewport bottom, defining the height with top */
-      justify-content: center; /* Vertically center buttons within this defined space */
-      width: 100%; /* Make the container span full viewport width */
-      /* overflow-y: auto; is inherited and will allow scrolling */
-      /* Adjust padding-top for mobile. var(--s) is 37.5px here. */
-      padding-top: calc(var(--s) / 2); /* Offset by half the signature height */
+      left: 0;
+      transform: none;
+      bottom: 0;
+      justify-content: center;
+      width: 100%;
+      padding-top: calc(var(--s) / 2);
   }
 
   .b {
@@ -590,7 +173,7 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
 
 @media (max-width: 480px) {
   :root {
-      --s: 37.5px; /* 50% of desktop 75px */
+      --s: 37.5px;
   }
 
   .b-c {
@@ -611,16 +194,15 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
   left: 0;
   width: 100vw;
   height: 100vh;
-  pointer-events: none; /* Allows clicks to pass through */
-  z-index: 2; /* Above scene (0), below old menu (3) and debug menu (100) */
-  overflow: hidden; /* Prevent scrollbars if a cake briefly pokes out */
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
 }
 
 .small-cake {
-  position: absolute; /* Positioned by JS */
-  width: 60px;  /* Small cake width */
-  height: 80px; /* Small cake height (maintaining aspect ratio of 300x400) */
-  /* pointer-events: none; already on container */
+  position: absolute;
+  width: 60px;
+  height: 80px;
 }
 
 .small-cake-layer {
@@ -638,29 +220,26 @@ a.b[href*="roblox.com"] { /* Make selector more specific */
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
   mask-position: center;
-  -webkit-mask-mode: alpha; /* canvas selector now handles common image-rendering */
+  -webkit-mask-mode: alpha;
   mask-mode: alpha;
-  background-blend-mode: multiply; /* Blend the texture with the background color */
+  background-blend-mode: multiply;
 }
 
 .small-cake-base {
   background-image: url('/assets/bday/cakebase.png');
   -webkit-mask-image: url('/assets/bday/cakebase_mask.png');
   mask-image: url('/assets/bday/cakebase_mask.png');
-  /* background-color will be set by JS */
 }
 
 .small-cake-frosting {
   background-image: url('/assets/bday/cakefrosting.png');
   -webkit-mask-image: url('/assets/bday/cakefrosting_mask.png');
   mask-image: url('/assets/bday/cakefrosting_mask.png');
-  /* background-color will be set by JS */
 }
 
 .small-cake-cherries {
   background-image: url('/assets/bday/cakecherries.png');
   -webkit-mask-image: url('/assets/bday/cakecherries_mask.png');
   mask-image: url('/assets/bday/cakecherries_mask.png');
-  /* background-color will be set by JS */
 }
 /* --- END: Raining Cake Styles --- */
