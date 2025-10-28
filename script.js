@@ -685,37 +685,75 @@ document.addEventListener('DOMContentLoaded', () => {
         baseImg.onerror = () => console.error("Failed to load base favicon");
     }
 
-    function handleOldMenuLastFmUpdate(data) {
+    async function handleOldMenuLastFmUpdate(data) {
         if (!state.oldMenu.btn) initializeOldMenuSelectors();
         const isPlaying = data?.recenttracks?.track?.[0]?.["@attr"]?.nowplaying === "true";
         const user = data?.recenttracks?.["@attr"]?.user;
-        let artUrl = null, trackName = null, artistName = null, trackUrl = null;
+        let artUrl = null;
+
+        updateOldMenuElementsStyle();
+        updateOldMenuThemeMetaTag();
 
         if (isPlaying) {
             const track = data.recenttracks.track[0];
-            trackName = track.name?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Track';
-            artistName = track.artist?.["#text"]?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Artist';
-            trackUrl = track.url || (user ? `https://www.last.fm/user/${user}` : "#");
+            const trackName = track.name?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Track';
+            const artistName = track.artist?.["#text"]?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Artist';
+            const lastFmTrackUrl = track.url || (user ? `https://www.last.fm/user/${user}` : "#");
+            let finalTrackUrl = lastFmTrackUrl; // Default to Last.fm
+
             const imgInfo = track.image?.find(img => img.size === 'extralarge' || img.size === 'large');
             if (imgInfo?.["#text"] && !imgInfo["#text"].includes("2a96cbd8b46e442fc41c2b86b821562f")) {
                 artUrl = imgInfo["#text"];
             }
-        }
-        updateOldMenuElementsStyle();
-        updateOldMenuFavicon(artUrl, isPlaying);
-        updateOldMenuThemeMetaTag();
-        if (state.oldMenu.btn) {
-            if (isPlaying && trackName && artistName) {
+
+            if (state.oldMenu.btn) {
                 state.oldMenu.btn.textContent = `Listening to ${trackName} by ${artistName}`;
-                state.oldMenu.btn.href = trackUrl;
-            } else {
+            }
+
+            try {
+                // 1. Try to find Apple Music link
+                const searchTerm = `${trackName} ${artistName}`;
+                const appleMusicSearchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=song&limit=1&media=music`;
+                const response = await fetch(appleMusicSearchUrl);
+                
+                if (response.ok) {
+                    const appleData = await response.json();
+                    if (appleData.resultCount > 0 && appleData.results[0].trackViewUrl) {
+                        finalTrackUrl = appleData.results[0].trackViewUrl; // Found Apple Music
+                    } else {
+                        // 2. Apple Music not found, create Spotify search link
+                        const spotifySearchTerm = `${trackName} ${artistName}`;
+                        finalTrackUrl = `https://open.spotify.com/search/${encodeURIComponent(spotifySearchTerm)}`;
+                    }
+                } else {
+                    // 2. Apple Music API failed, create Spotify search link
+                    const spotifySearchTerm = `${trackName} ${artistName}`;
+                    finalTrackUrl = `https://open.spotify.com/search/${encodeURIComponent(spotifySearchTerm)}`;
+                }
+            } catch (error) {
+                // 3. Entire search failed (e.g., network error), fall back to Last.fm
+                console.warn('Music link search failed, falling back to Last.fm link:', error);
+                finalTrackUrl = lastFmTrackUrl;
+            }
+
+            if (state.oldMenu.btn) {
+                state.oldMenu.btn.href = finalTrackUrl;
+            }
+
+        } else {
+            // Not playing
+            if (state.oldMenu.btn) {
                 state.oldMenu.btn.textContent = "Last.fm";
                 state.oldMenu.btn.href = user ? `https://www.last.fm/user/${user}` : "#";
             }
         }
+        
+        // Update favicon regardless of playing state
+        updateOldMenuFavicon(artUrl, isPlaying);
     }
 
-    function updateLastFmUI(data) {
+
+    async function updateLastFmUI(data) {
         let useDefault = false;
         const track = data?.recenttracks?.track?.[0];
 
@@ -743,7 +781,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.lastFmColorsExtractedSuccessfully = false;
             performInitialSceneSetupIfNeeded();
         }
-        handleOldMenuLastFmUpdate(data);
+        await handleOldMenuLastFmUpdate(data);
     }
 
 
@@ -752,10 +790,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(LASTFM_API_URL);
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const data = await res.json();
-            updateLastFmUI(data);
+            await updateLastFmUI(data);
         } catch (error) {
             console.error('Error fetching Last.fm data:', error);
-            handleOldMenuLastFmUpdate(null);
+            handleOldMenuLastFmUpdate(null); // This is not async, fine
             applyDefaultColors();
         } finally {
             state.firstLastFmFetchAttempted = true;
@@ -1237,7 +1275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyPostProcessingFilters();
     setupEventListeners(); // This will now also call setupJigglyButtonEffects
     initializeOldMenuSelectors();
-    handleOldMenuLastFmUpdate(null);
+    handleOldMenuLastFmUpdate(null); // Not async, fine
     loadDefaultColors(); // Clamps defaults
     fetchLastFmData(); // Fetches and clamps Last.fm colors
     resetLastFmInterval();
