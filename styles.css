@@ -82,6 +82,7 @@ canvas, .small-cake-layer { /* Combined image-rendering */
   z-index: 3;
   gap: 0;
   padding-top: 150px;
+  padding-bottom: calc(var(--s) * 0.5); /* --- THIS LINE WAS CHANGED --- */
   max-height: calc(100vh - (2 * var(--s)));
   overflow-y: auto;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
@@ -98,7 +99,23 @@ canvas, .small-cake-layer { /* Combined image-rendering */
 
 .b { /* Individual links in the old menu */
   opacity: .8;
-  transition: opacity .3s, transform .3s, font-weight .3s;
+  
+  /* --- KEY CHANGES HERE --- */
+  /* A very bouncy "jello" timing function */
+  --jello-bezier: cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  --jello-duration: 0.4s; /* Faster duration */
+  
+  /* Apply the jello transition to all properties JS will change */
+  transition: opacity var(--jello-duration) var(--jello-bezier), 
+              transform var(--jello-duration) var(--jello-bezier), 
+              font-weight var(--jello-duration) var(--jello-bezier);
+              /* Note: We are now transitioning 'transform' */
+  
+  /* Ensure base margins are 0 to keep zero spacing */
+  margin-top: 0;
+  margin-bottom: 0;
+  /* --- END KEY CHANGES --- */
+  
   font-size: var(--s);
   cursor: pointer;
   transform-origin: left;
@@ -127,8 +144,12 @@ a.b[href*="roblox.com"] {
 
 .b:hover {
   opacity: 1;
-  transform: scale(1.1);
+  /* We only apply scale here. JS handles the neighbors' translation */
+  transform: scale(1.1); 
   font-weight: 700;
+  
+  /* --- KEY CHANGES HERE --- */
+  /* NO margins or translations applied here */
 }
 
 #lastfm-button { /* Specific style for the Last.fm button */
@@ -159,10 +180,12 @@ a.b[href*="roblox.com"] {
       justify-content: center;
       width: 100%;
       padding-top: calc(var(--s) / 2);
+      /* Add bottom padding for mobile too */
+      padding-bottom: calc(var(--s) * 0.5); /* --- THIS LINE WAS CHANGED --- */
   }
 
   .b {
-      transform-origin: center;
+      transform-origin: center; /* Ensures scaling is from the center on mobile */
       text-align: center;
       flex-shrink: 0;
       width: auto;
