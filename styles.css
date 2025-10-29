@@ -2,8 +2,8 @@
    GLOBAL VARIABLES
    =============================== */
 :root {
-  --s: 75px; /* for menu sizing and positioning */
-  --real100vh: 100dvh; /* dynamic viewport height for Safari + modern browsers */
+  --s: 75px; /* menu sizing */
+  --real100vh: 100vh; /* leave at classic vh for test */
 }
 
 /* ===============================
@@ -12,17 +12,26 @@
 html,
 body {
   margin: 0;
-  padding: 0;
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background-color: #121212;
+  background: linear-gradient(135deg, #6b6bff, #ff6b6b);
+  background-attachment: fixed;
+  background-position: center;
+  background-size: cover;
+
+  /* 👇 what the poster suggested */
+  padding: env(safe-area-inset-top)
+           env(safe-area-inset-right)
+           env(safe-area-inset-bottom)
+           env(safe-area-inset-left);
+
+  font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #eaeaea;
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: var(--real100vh);
-  font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #eaeaea;
 }
 
 /* Scene container and background */
@@ -31,12 +40,8 @@ body {
   inset: 0;
   width: 100vw;
   height: var(--real100vh);
-  overflow: hidden;
   z-index: 0;
-}
-
-#scene-container.no-transition::before {
-  transition: none !important;
+  overflow: hidden;
 }
 
 .blur-layer {
@@ -47,14 +52,6 @@ body {
 #blur-layer-1 {
   width: 100%;
   height: 100%;
-}
-
-canvas,
-.small-cake-layer {
-  display: block;
-  image-rendering: pixelated;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: crisp-edges;
 }
 
 /* ===============================
@@ -85,18 +82,18 @@ canvas,
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0;
   z-index: 3;
+  gap: 0;
   padding-top: 150px;
   padding-bottom: calc(var(--s) * 0.5);
   max-height: calc(var(--real100vh) - (2 * var(--s)));
   overflow-y: auto;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
+  mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   box-sizing: border-box;
   font-family: Fustat, sans-serif;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
-  mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
 }
 
 .b-c::-webkit-scrollbar {
@@ -121,7 +118,6 @@ canvas,
   pointer-events: auto;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   position: relative;
-
   transition:
     opacity 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55),
     transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55),
@@ -249,42 +245,4 @@ a.b[href*="roblox.com"] {
   background-image: url("/assets/bday/cakecherries.png");
   -webkit-mask-image: url("/assets/bday/cakecherries_mask.png");
   mask-image: url("/assets/bday/cakecherries_mask.png");
-}
-
-/* ===============================
-   SAFARI FIXES: Stretch Under Address Bar
-   =============================== */
-
-/* Modern iOS (15.4+ with dvh support) */
-@supports (-webkit-touch-callout: none) {
-  html,
-  body {
-    min-height: 100dvh;
-    background-color: #121212;
-  }
-
-  #scene-container,
-  #raining-cakes-container {
-    position: fixed;
-    inset: 0;
-    height: 100dvh;
-    width: 100vw;
-    overflow: hidden;
-  }
-
-  body {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
-
-/* Legacy iOS fallback (pre-dvh) */
-@supports not (height: 100dvh) {
-  #scene-container,
-  #raining-cakes-container {
-    position: fixed;
-    top: calc(-1 * env(safe-area-inset-top));
-    left: 0;
-    width: 100vw;
-    height: calc(100vh + env(safe-area-inset-top));
-  }
 }
