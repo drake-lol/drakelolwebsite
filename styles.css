@@ -29,8 +29,8 @@ html, body, #scene-container {
   padding: 0;
   margin: 0;
   /* explicitly ignore safe-area paddings */
-  height: 100dvh;
-  width: 100vw;
+  height: 110dvh;
+  width: 110vw;
   inset: 0;
   position: fixed;
 }
