@@ -1,27 +1,35 @@
+/* ===============================
+   GLOBAL VARIABLES
+   =============================== */
 :root {
   --s: 75px; /* For old menu positioning and sizing */
-  --real100vh: 100vh; /* dynamic viewport height variable */
+  --real100vh: 100dvh; /* Dynamic viewport height variable for Safari + modern browsers */
 }
 
-/* Base layout */
-body {
+/* ===============================
+   BASE LAYOUT
+   =============================== */
+html, body {
   margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
   background-color: #121212;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: var(--real100vh);
   font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #EAEAEA;
 }
 
+/* Scene container and main canvas layer */
 #scene-container {
-  width: 100vw;
-  height: 100vh;
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
+  width: 100vw;
+  height: var(--real100vh);
   z-index: 0;
   overflow: hidden;
 }
@@ -31,11 +39,8 @@ body {
 }
 
 .blur-layer {
-  width: 100%;
-  height: 100%;
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
 }
 
 #blur-layer-1 {
@@ -53,7 +58,9 @@ canvas,
   image-rendering: crisp-edges;
 }
 
-/* --- START: Styles for copied old menu --- */
+/* ===============================
+   OLD MENU STYLES
+   =============================== */
 .signature-container {
   position: fixed;
   top: var(--s);
@@ -83,7 +90,7 @@ canvas,
   gap: 0;
   padding-top: 150px;
   padding-bottom: calc(var(--s) * 0.5);
-  max-height: calc(100vh - (2 * var(--s)));
+  max-height: calc(var(--real100vh) - (2 * var(--s)));
   overflow-y: auto;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
@@ -101,13 +108,10 @@ canvas,
   opacity: 0.8;
   --jello-bezier: cubic-bezier(0.68, -0.55, 0.27, 1.55);
   --jello-duration: 0.4s;
-
   transition: opacity var(--jello-duration) var(--jello-bezier),
     transform var(--jello-duration) var(--jello-bezier),
     font-weight var(--jello-duration) var(--jello-bezier);
-
-  margin-top: 0;
-  margin-bottom: 0;
+  margin: 0;
   font-size: var(--s);
   cursor: pointer;
   transform-origin: left;
@@ -145,7 +149,9 @@ a.b[href*="roblox.com"] {
   white-space: normal;
 }
 
-/* Mobile adjustments */
+/* ===============================
+   MOBILE ADJUSTMENTS
+   =============================== */
 @media (max-width: 768px) {
   :root {
     --s: 37.5px;
@@ -193,15 +199,15 @@ a.b[href*="roblox.com"] {
     padding: 0 2px;
   }
 }
-/* --- END: Styles for copied old menu --- */
 
-/* --- START: Raining Cake Styles --- */
+/* ===============================
+   RAINING CAKE STYLES
+   =============================== */
 #raining-cakes-container {
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100vw;
-  height: 100vh;
+  height: var(--real100vh);
   pointer-events: none;
   z-index: 2;
   overflow: hidden;
@@ -215,10 +221,7 @@ a.b[href*="roblox.com"] {
 
 .small-cake-layer {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
@@ -250,29 +253,36 @@ a.b[href*="roblox.com"] {
   -webkit-mask-image: url("/assets/bday/cakecherries_mask.png");
   mask-image: url("/assets/bday/cakecherries_mask.png");
 }
-/* --- END: Raining Cake Styles --- */
 
-/* --- SAFARI: stretch content under address bar --- */
+/* ===============================
+   SAFARI FIX: Stretch Under Address Bar
+   =============================== */
 @supports (-webkit-touch-callout: none) {
-  html,
-  body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
+  html, body {
+    min-height: 100dvh;
+    background-color: #121212;
   }
 
   #scene-container,
   #raining-cakes-container {
     position: fixed;
-    top: calc(-1 * env(safe-area-inset-top)); /* stretch into toolbar */
-    left: 0;
+    inset: 0;
     width: 100vw;
-    height: calc(100vh + env(safe-area-inset-top)); /* extend upward */
+    height: 100dvh;
     z-index: 0;
     overflow: hidden;
   }
 
   body {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Legacy iOS Fallback */
+@supports not (height: 100dvh) {
+  #scene-container,
+  #raining-cakes-container {
+    height: calc(100vh + env(safe-area-inset-top));
+    top: calc(-1 * env(safe-area-inset-top));
   }
 }
