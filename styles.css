@@ -1,64 +1,64 @@
 :root {
   --s: 75px; /* For old menu positioning and sizing */
-  /* Removed Material You variables */
   --real100vh: 100vh; /* dynamic viewport height variable */
 }
 
+/* Base layout */
 body {
-    margin: 0;
-    overflow: hidden;
-    background-color: #121212;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    color: #EAEAEA; /* Default text color, primarily for old menu */
+  margin: 0;
+  overflow: hidden;
+  background-color: #121212;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #EAEAEA;
 }
 
 #scene-container {
-    width: 100vw;
-    height: 100vh;
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 0;
-    overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  overflow: hidden;
 }
+
 #scene-container.no-transition::before {
-    transition: none !important;
+  transition: none !important;
 }
 
-.blur-layer { /* Style for the blur wrapper divs */
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
+.blur-layer {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
+
 #blur-layer-1 {
-    /* Styles for scaling applied by JS if blur is active */
-    width: 100%; height: 100%;
-    top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
 }
 
-/* Removed overlay styles (#scene-container::before, #scene-container.light-bg::before) */
-
-canvas, .small-cake-layer { /* Combined image-rendering */
-    display: block;
-    image-rendering: pixelated; /* Modern browsers */
-    image-rendering: -moz-crisp-edges; /* Firefox */
-    image-rendering: crisp-edges; /* Older spec */
+canvas,
+.small-cake-layer {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
 }
-
-/* --- Removed all #debug-menu related styles --- */
 
 /* --- START: Styles for copied old menu --- */
 .signature-container {
   position: fixed;
   top: var(--s);
   left: var(--s);
-  z-index: 3; /* Ensure it's above the main scene */
+  z-index: 3;
   font-family: Fustat, sans-serif;
 }
 
@@ -66,14 +66,12 @@ canvas, .small-cake-layer { /* Combined image-rendering */
   height: var(--s);
   width: auto;
   user-select: none;
-  opacity: .8;
-  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
+  opacity: 0.8;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.3));
   pointer-events: none;
 }
 
-/* .cls-1 defined in SVG, JS overrides fill */
-
-.b-c { /* Button container for old menu links */
+.b-c {
   position: fixed;
   top: calc(2 * var(--s));
   left: var(--s);
@@ -84,41 +82,38 @@ canvas, .small-cake-layer { /* Combined image-rendering */
   z-index: 3;
   gap: 0;
   padding-top: 150px;
-  padding-bottom: calc(var(--s) * 0.5); /* --- THIS LINE WAS CHANGED --- */
+  padding-bottom: calc(var(--s) * 0.5);
   max-height: calc(100vh - (2 * var(--s)));
   overflow-y: auto;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   box-sizing: border-box;
   font-family: Fustat, sans-serif;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .b-c::-webkit-scrollbar {
-  display: none; /* WebKit */
+  display: none;
 }
 
-.b { /* Individual links in the old menu */
-  opacity: .8;
-  
-  /* --- KEY CHANGES HERE --- */
+.b {
+  opacity: 0.8;
   --jello-bezier: cubic-bezier(0.68, -0.55, 0.27, 1.55);
   --jello-duration: 0.4s;
-  
-  transition: opacity var(--jello-duration) var(--jello-bezier), 
-              transform var(--jello-duration) var(--jello-bezier), 
-              font-weight var(--jello-duration) var(--jello-bezier);
-  
+
+  transition: opacity var(--jello-duration) var(--jello-bezier),
+    transform var(--jello-duration) var(--jello-bezier),
+    font-weight var(--jello-duration) var(--jello-bezier);
+
   margin-top: 0;
   margin-bottom: 0;
-  
   font-size: var(--s);
   cursor: pointer;
   transform-origin: left;
   text-align: left;
   text-decoration: none;
-  color: inherit; /* JS will set it */
+  color: inherit;
   max-width: 80vw;
   box-sizing: border-box;
   padding: 0 10px;
@@ -127,7 +122,7 @@ canvas, .small-cake-layer { /* Combined image-rendering */
   -webkit-user-drag: none;
   pointer-events: auto;
   font-weight: 300;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   position: relative;
 }
 
@@ -141,7 +136,7 @@ a.b[href*="roblox.com"] {
 
 .b:hover {
   opacity: 1;
-  transform: scale(1.1); 
+  transform: scale(1.1);
   font-weight: 700;
 }
 
@@ -150,52 +145,52 @@ a.b[href*="roblox.com"] {
   white-space: normal;
 }
 
-/* Media Queries for the old menu elements */
+/* Mobile adjustments */
 @media (max-width: 768px) {
   :root {
-      --s: 37.5px;
+    --s: 37.5px;
   }
 
   .signature-container {
-      left: 50%;
-      transform: translateX(-50%);
-      top: var(--s);
+    left: 50%;
+    transform: translateX(-50%);
+    top: var(--s);
   }
 
   .b-c {
-      flex-direction: column;
-      align-items: center;
-      left: 0;
-      transform: none;
-      bottom: 0;
-      justify-content: center;
-      width: 100%;
-      padding-top: calc(var(--s) / 2);
-      padding-bottom: calc(var(--s) * 0.5);
+    flex-direction: column;
+    align-items: center;
+    left: 0;
+    transform: none;
+    bottom: 0;
+    justify-content: center;
+    width: 100%;
+    padding-top: calc(var(--s) / 2);
+    padding-bottom: calc(var(--s) * 0.5);
   }
 
   .b {
-      transform-origin: center;
-      text-align: center;
-      flex-shrink: 0;
-      width: auto;
-      max-width: 90%;
-      padding: 0 5px;
+    transform-origin: center;
+    text-align: center;
+    flex-shrink: 0;
+    width: auto;
+    max-width: 90%;
+    padding: 0 5px;
   }
 }
 
 @media (max-width: 480px) {
   :root {
-      --s: 37.5px;
+    --s: 37.5px;
   }
 
   .b-c {
-      gap: 0;
+    gap: 0;
   }
 
   .b {
-      max-width: 95%;
-      padding: 0 2px;
+    max-width: 95%;
+    padding: 0 2px;
   }
 }
 /* --- END: Styles for copied old menu --- */
@@ -239,38 +234,45 @@ a.b[href*="roblox.com"] {
 }
 
 .small-cake-base {
-  background-image: url('/assets/bday/cakebase.png');
-  -webkit-mask-image: url('/assets/bday/cakebase_mask.png');
-  mask-image: url('/assets/bday/cakebase_mask.png');
+  background-image: url("/assets/bday/cakebase.png");
+  -webkit-mask-image: url("/assets/bday/cakebase_mask.png");
+  mask-image: url("/assets/bday/cakebase_mask.png");
 }
 
 .small-cake-frosting {
-  background-image: url('/assets/bday/cakefrosting.png');
-  -webkit-mask-image: url('/assets/bday/cakefrosting_mask.png');
-  mask-image: url('/assets/bday/cakefrosting_mask.png');
+  background-image: url("/assets/bday/cakefrosting.png");
+  -webkit-mask-image: url("/assets/bday/cakefrosting_mask.png");
+  mask-image: url("/assets/bday/cakefrosting_mask.png");
 }
 
 .small-cake-cherries {
-  background-image: url('/assets/bday/cakecherries.png');
-  -webkit-mask-image: url('/assets/bday/cakecherries_mask.png');
-  mask-image: url('/assets/bday/cakecherries_mask.png');
+  background-image: url("/assets/bday/cakecherries.png");
+  -webkit-mask-image: url("/assets/bday/cakecherries_mask.png");
+  mask-image: url("/assets/bday/cakecherries_mask.png");
 }
 /* --- END: Raining Cake Styles --- */
 
-
-/* --- SAFARI / iOS FULLSCREEN FIX --- */
-
-/* Enable edge-to-edge layout */
+/* --- SAFARI: stretch content under address bar --- */
 @supports (-webkit-touch-callout: none) {
+  html,
   body {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    height: 100%;
+    margin: 0;
+    padding: 0;
   }
 
   #scene-container,
   #raining-cakes-container {
-    height: calc(var(--real100vh) + env(safe-area-inset-top) + env(safe-area-inset-bottom));
+    position: fixed;
+    top: calc(-1 * env(safe-area-inset-top)); /* stretch into toolbar */
+    left: 0;
+    width: 100vw;
+    height: calc(100vh + env(safe-area-inset-top)); /* extend upward */
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
