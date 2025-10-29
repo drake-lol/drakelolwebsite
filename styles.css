@@ -3,7 +3,7 @@
    =============================== */
 :root {
   --s: 75px; /* menu sizing */
-  --real100vh: 100vh; /* leave at classic vh for test */
+  --real100vh: 100vh; /* still using classic vh for main layout */
 }
 
 /* ===============================
@@ -20,7 +20,7 @@ body {
   background-position: center;
   background-size: cover;
 
-  /* 👇 what the poster suggested */
+  /* 👇 safe-area respect from forum */
   padding: env(safe-area-inset-top)
            env(safe-area-inset-right)
            env(safe-area-inset-bottom)
@@ -34,7 +34,9 @@ body {
   min-height: var(--real100vh);
 }
 
-/* Scene container and background */
+/* ===============================
+   SCENE CONTAINER & CANVAS
+   =============================== */
 #scene-container {
   position: fixed;
   inset: 0;
@@ -42,6 +44,21 @@ body {
   height: var(--real100vh);
   z-index: 0;
   overflow: hidden;
+}
+
+/* make sure canvas covers entire viewport (including under Safari bar) */
+#scene-container canvas {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh; /* ✅ dynamic viewport height */
+  display: block;
+}
+
+@supports not (height: 100dvh) {
+  #scene-container canvas {
+    height: calc(100vh + env(safe-area-inset-top));
+  }
 }
 
 .blur-layer {
