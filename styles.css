@@ -3,7 +3,6 @@
    =============================== */
 :root {
   --s: 75px; /* menu sizing */
-  --real100vh: 100vh; /* still using classic vh for main layout */
 }
 
 /* ===============================
@@ -19,46 +18,38 @@ body {
   background-attachment: fixed;
   background-position: center;
   background-size: cover;
-
-  /* 👇 safe-area respect from forum */
-  padding: env(safe-area-inset-top)
-           env(safe-area-inset-right)
-           env(safe-area-inset-bottom)
-           env(safe-area-inset-left);
-
+  /* IMPORTANT: no safe-area padding on body, it clips fixed children */
   font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #eaeaea;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: var(--real100vh);
+  min-height: 100vh;
 }
 
 /* ===============================
    SCENE CONTAINER & CANVAS
    =============================== */
+/* Full-bleed under-address-bar technique:
+   Use top/bottom anchors with a negative top offset equal to the safe area. */
 #scene-container {
   position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: var(--real100vh);
+  left: 0;
+  right: 0;
+  top: calc(-1 * env(safe-area-inset-top));
+  bottom: 0;
   z-index: 0;
   overflow: hidden;
 }
 
-/* make sure canvas covers entire viewport (including under Safari bar) */
+/* Ensure the <canvas> fills the container box.
+   (Your JS should set the drawing buffer size; this is the CSS box.) */
 #scene-container canvas {
   position: absolute;
   inset: 0;
-  width: 100vw;
-  height: 100dvh; /* ✅ dynamic viewport height */
+  width: 100%;
+  height: 100%;
   display: block;
-}
-
-@supports not (height: 100dvh) {
-  #scene-container canvas {
-    height: calc(100vh + env(safe-area-inset-top));
-  }
 }
 
 .blur-layer {
@@ -103,7 +94,8 @@ body {
   gap: 0;
   padding-top: 150px;
   padding-bottom: calc(var(--s) * 0.5);
-  max-height: calc(var(--real100vh) - (2 * var(--s)));
+  /* Use viewport height for scroll area — container already extends under bar */
+  max-height: calc(100vh - (2 * var(--s)));
   overflow-y: auto;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
@@ -215,9 +207,10 @@ a.b[href*="roblox.com"] {
    =============================== */
 #raining-cakes-container {
   position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: var(--real100vh);
+  left: 0;
+  right: 0;
+  top: calc(-1 * env(safe-area-inset-top));
+  bottom: 0;
   pointer-events: none;
   overflow: hidden;
   z-index: 2;
@@ -262,4 +255,14 @@ a.b[href*="roblox.com"] {
   background-image: url("/assets/bday/cakecherries.png");
   -webkit-mask-image: url("/assets/bday/cakecherries_mask.png");
   mask-image: url("/assets/bday/cakecherries_mask.png");
+}
+
+/* ===============================
+   SAFARI TWEAKS (optional)
+   =============================== */
+@supports (-webkit-touch-callout: none) {
+  /* If you want bottom content safe padding for interactive elements: */
+  body {
+    /* padding-bottom: env(safe-area-inset-bottom); */
+  }
 }
