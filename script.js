@@ -1279,4 +1279,48 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDefaultColors(); // Clamps defaults
     fetchLastFmData(); // Fetches and clamps Last.fm colors
     resetLastFmInterval();
+
+// -------------------------------------------------------------
+// ✅ SAFARI / iOS DYNAMIC VIEWPORT FIX — Two.js-safe version
+// -------------------------------------------------------------
+function resizeToDynamicViewport() {
+  const sceneContainer = document.getElementById('scene-container');
+  if (!sceneContainer || !state.twoJsCanvas) return;
+
+  // Use visualViewport on iOS so we include the area behind the address bar
+  const vw = Math.round(window.innerWidth);
+  const vh = Math.round(window.visualViewport ? window.visualViewport.height : window.innerHeight);
+
+  // Size the container box
+  sceneContainer.style.width  = vw + 'px';
+  sceneContainer.style.height = vh + 'px';
+
+  // IMPORTANT: resize Two.js via its renderer, not by touching canvas.width/height
+  try {
+    const ratio = window.devicePixelRatio || 1;
+    if (two && two.renderer && typeof two.renderer.setSize === 'function') {
+      // Some Two.js builds accept (w, h, ratio); if your build ignores ratio it’s fine.
+      two.renderer.setSize(vw, vh, ratio);
+    }
+    // Keep Two's internal width/height in sync for your layout logic
+    two.width  = vw;
+    two.height = vh;
+
+    // Let Two.js react to the new size (camera/projection updates, etc.)
+    if (typeof two.trigger === 'function') two.trigger('resize');
+  } catch (e) {
+    console.warn('Two.js resize failed:', e);
+  }
+
+  // CSS size so it actually fills behind the liquid-glass bar
+  state.twoJsCanvas.style.width  = '100vw';
+  state.twoJsCanvas.style.height = '100dvh';
+}
+
+// Run once and on viewport changes (rotation, bar show/hide)
+resizeToDynamicViewport();
+window.addEventListener('resize', resizeToDynamicViewport);
+window.visualViewport?.addEventListener('resize', resizeToDynamicViewport);
+window.visualViewport?.addEventListener('scroll', resizeToDynamicViewport);
+
 });
