@@ -2,46 +2,43 @@
 :root {
   --s: clamp(37.5px, 5vw, 75px);
   --menu-shift: calc(1.45 * var(--s)); /* slightly lower than before */
+  --fade-start: calc(-0.25 * var(--s));
+  --fade-end: calc(0.75 * var(--s));
 }
 
 /* --- GLOBAL RESET --- */
 html, body {
   margin: 0;
   padding: 0;
-  overflow: hidden;
-  height: 100dvh;
-  width: 100vw;
   background-color: #121212;
   display: flex;
   justify-content: center;
   align-items: center;
+  min-height: 100vh;
   font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #EAEAEA;
   -webkit-overflow-scrolling: touch;
-  position: fixed;
-  inset: 0;
+  overflow-x: hidden;
+  overflow-y: visible;
+  position: relative;
 }
 
-/* --- SCENE CONTAINER (centered, bottom-biased) --- */
+/* --- SCENE CONTAINER --- */
 #scene-container {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   width: 100vw;
-  height: 100dvh;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
   z-index: 0;
   overflow: hidden;
-
   display: flex;
   justify-content: center;
   align-items: flex-end;
-
   transform-origin: center center;
   will-change: transform;
 }
 
-/* --- BLUR LAYERS --- */
 .blur-layer {
   width: 100%;
   height: 100%;
@@ -50,14 +47,7 @@ html, body {
   left: 0;
 }
 
-#blur-layer-1 {
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-}
-
-/* --- CANVAS RENDER --- */
+/* --- CANVAS --- */
 canvas, .small-cake-layer {
   display: block;
   image-rendering: pixelated;
@@ -87,42 +77,39 @@ canvas, .small-cake-layer {
 .b-c {
   position: fixed;
   top: calc(2 * var(--s));
-  bottom: var(--s);
   left: var(--s);
   right: var(--s);
+  z-index: 3;
 
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
   align-items: flex-start;
-  z-index: 3;
+  justify-content: flex-end;
+
   gap: 0;
-
-  padding-top: 0;
+  padding-top: calc(var(--s) * 2);
   padding-bottom: var(--menu-shift);
+  max-height: calc(100vh - (2 * var(--s)));
 
-  /* move the entire container further down */
-  transform: translateY(var(--menu-shift));
-
-  /* allow native manual scrolling */
   overflow-y: auto;
   overflow-x: visible;
-  -webkit-overflow-scrolling: touch; /* enables smooth iOS scrolling */
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
-
   font-family: Fustat, sans-serif;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  overscroll-behavior: contain;
 
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
-  mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
+  /* fade starts just under signature */
+  -webkit-mask-image: linear-gradient(to bottom, transparent var(--fade-start), black var(--fade-end));
+  mask-image: linear-gradient(to bottom, transparent var(--fade-start), black var(--fade-end));
 }
 
 .b-c::-webkit-scrollbar {
   display: none;
 }
 
-/* --- BUTTON STYLES --- */
+/* --- BUTTONS --- */
 .b {
   opacity: 0.8;
   --jello-bezier: cubic-bezier(0.68, -0.55, 0.27, 1.55);
@@ -170,22 +157,25 @@ canvas, .small-cake-layer {
 
   .b-c {
     top: calc(2 * var(--s));
-    bottom: var(--s);
-    align-items: flex-start;
-    left: var(--s);
-    right: var(--s);
-    padding-bottom: var(--menu-shift);
-    transform: translateY(var(--menu-shift));
-    justify-content: flex-end;
-    flex-direction: column;
+    left: 0;
+    right: 0;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding-top: calc(var(--s) / 2);
+    padding-bottom: calc(var(--s) * 0.5);
+    max-height: calc(100vh - (2 * var(--s)));
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .b {
-    transform-origin: left;
-    text-align: left;
+    transform-origin: center;
+    text-align: center;
     flex-shrink: 0;
     width: auto;
-    max-width: 100%;
+    max-width: 90%;
     padding: 0 5px;
   }
 }
@@ -196,7 +186,7 @@ canvas, .small-cake-layer {
   }
 
   .b {
-    max-width: 100%;
+    max-width: 95%;
     padding: 0 2px;
   }
 }
@@ -204,16 +194,13 @@ canvas, .small-cake-layer {
 /* --- RAINING CAKE EFFECTS --- */
 #raining-cakes-container {
   position: fixed;
-  bottom: 0;
+  top: 0;
   left: 0;
   width: 100vw;
-  height: 100dvh;
+  height: 100vh;
   pointer-events: none;
   z-index: 2;
   overflow: hidden;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
 }
 
 .small-cake {
