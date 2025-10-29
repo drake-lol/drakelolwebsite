@@ -1,94 +1,77 @@
-/* ===============================
-   GLOBAL VARIABLES
-   =============================== */
 :root {
-  --s: 75px; /* menu sizing */
+  --s: 75px; /* For old menu positioning and sizing */
+  /* Removed Material You variables */
 }
 
-/* ===============================
-   BASE LAYOUT
-   =============================== */
-html,
+
 body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-
-  /* ✅ fully transparent background */
-  background: transparent !important;
-
-  font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #eaeaea;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  /* ✅ ensures it stretches fully under Safari bars */
-  min-height: 100dvh;
-
-  /* ✅ respect iOS safe areas */
-  padding: env(safe-area-inset-top)
-           env(safe-area-inset-right)
-           env(safe-area-inset-bottom)
-           env(safe-area-inset-left);
+    margin: 0;
+    overflow: hidden;
+    background-color: #121212;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #EAEAEA; /* Default text color, primarily for old menu */
 }
-
-/* ===============================
-   SCENE CONTAINER & CANVAS
-   =============================== */
 #scene-container {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100dvh; /* ✅ dynamic viewport height */
-  background: transparent !important;
-  z-index: 0;
-  overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    overflow: hidden;
 }
-
-#scene-container canvas {
-  position: absolute;
-  inset: 0;
-  width: 100vw;
-  height: 100dvh; /* ✅ extends behind Safari liquid-glass bar */
-  display: block;
-  background: transparent !important;
+#scene-container.no-transition::before {
+    transition: none !important;
 }
-
-.blur-layer {
-  position: absolute;
-  inset: 0;
-  background: transparent !important;
+.blur-layer { /* Style for the blur wrapper divs */
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
-
 #blur-layer-1 {
-  width: 100%;
-  height: 100%;
+    /* Styles for scaling applied by JS if blur is active */
+    width: 100%; height: 100%;
+    top: 0; left: 0;
 }
 
-/* ===============================
-   SIGNATURE + MENU
-   =============================== */
+/* Removed overlay styles (#scene-container::before, #scene-container.light-bg::before) */
+
+canvas, .small-cake-layer { /* Combined image-rendering */
+    display: block;
+    image-rendering: pixelated; /* Modern browsers */
+    image-rendering: -moz-crisp-edges; /* Firefox */
+    image-rendering: crisp-edges; /* Older spec */
+}
+
+/* --- Removed all #debug-menu related styles --- */
+
+/* --- START: Styles for copied old menu --- */
 .signature-container {
   position: fixed;
   top: var(--s);
   left: var(--s);
-  z-index: 3;
+  z-index: 3; /* Ensure it's above the main scene */
   font-family: Fustat, sans-serif;
 }
 
 .signature {
   height: var(--s);
   width: auto;
-  opacity: 0.8;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.3));
   user-select: none;
+  opacity: .8;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
   pointer-events: none;
 }
 
-.b-c {
+/* .cls-1 defined in SVG, JS overrides fill */
+
+.b-c { /* Button container for old menu links */
   position: fixed;
   top: calc(2 * var(--s));
   left: var(--s);
@@ -99,49 +82,56 @@ body {
   z-index: 3;
   gap: 0;
   padding-top: 150px;
-  padding-bottom: calc(var(--s) * 0.5);
-  max-height: calc(100dvh - (2 * var(--s)));
+  padding-bottom: calc(var(--s) * 0.5); /* --- THIS LINE WAS CHANGED --- */
+  max-height: calc(100vh - (2 * var(--s)));
   overflow-y: auto;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   box-sizing: border-box;
   font-family: Fustat, sans-serif;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
 }
 
 .b-c::-webkit-scrollbar {
-  display: none;
+  display: none; /* WebKit */
 }
 
-.b {
-  opacity: 0.8;
-  margin: 0;
-  padding: 0 10px;
+.b { /* Individual links in the old menu */
+  opacity: .8;
+  
+  /* --- KEY CHANGES HERE --- */
+  /* A very bouncy "jello" timing function */
+  --jello-bezier: cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  --jello-duration: 0.4s; /* Faster duration */
+  
+  /* Apply the jello transition to all properties JS will change */
+  transition: opacity var(--jello-duration) var(--jello-bezier), 
+              transform var(--jello-duration) var(--jello-bezier), 
+              font-weight var(--jello-duration) var(--jello-bezier);
+              /* Note: We are now transitioning 'transform' */
+  
+  /* Ensure base margins are 0 to keep zero spacing */
+  margin-top: 0;
+  margin-bottom: 0;
+  /* --- END KEY CHANGES --- */
+  
   font-size: var(--s);
-  font-weight: 300;
   cursor: pointer;
   transform-origin: left;
   text-align: left;
   text-decoration: none;
-  color: inherit;
-  text-transform: lowercase;
+  color: inherit; /* JS will set it */
   max-width: 80vw;
+  box-sizing: border-box;
+  padding: 0 10px;
+  text-transform: lowercase;
   user-select: none;
   -webkit-user-drag: none;
   pointer-events: auto;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  font-weight: 300;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.3);
   position: relative;
-  transition:
-    opacity 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55),
-    transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55),
-    font-weight 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-}
-
-.b:hover {
-  opacity: 1;
-  transform: scale(1.1);
-  font-weight: 700;
 }
 
 .b:not(#lastfm-button) {
@@ -152,73 +142,84 @@ a.b[href*="roblox.com"] {
   line-height: 2;
 }
 
-#lastfm-button {
+.b:hover {
+  opacity: 1;
+  /* We only apply scale here. JS handles the neighbors' translation */
+  transform: scale(1.1); 
+  font-weight: 700;
+  
+  /* --- KEY CHANGES HERE --- */
+  /* NO margins or translations applied here */
+}
+
+#lastfm-button { /* Specific style for the Last.fm button */
   word-wrap: break-word;
   white-space: normal;
 }
 
-/* ===============================
-   MOBILE ADJUSTMENTS
-   =============================== */
+/* --- Removed Corner Image Styles --- */
+
+/* Media Queries for the old menu elements */
 @media (max-width: 768px) {
   :root {
-    --s: 37.5px;
+      --s: 37.5px;
   }
 
   .signature-container {
-    left: 50%;
-    transform: translateX(-50%);
-    top: var(--s);
+      left: 50%;
+      transform: translateX(-50%);
+      top: var(--s);
   }
 
   .b-c {
-    flex-direction: column;
-    align-items: center;
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    transform: none;
-    justify-content: center;
-    padding-top: calc(var(--s) / 2);
-    padding-bottom: calc(var(--s) * 0.5);
+      flex-direction: column;
+      align-items: center;
+      left: 0;
+      transform: none;
+      bottom: 0;
+      justify-content: center;
+      width: 100%;
+      padding-top: calc(var(--s) / 2);
+      /* Add bottom padding for mobile too */
+      padding-bottom: calc(var(--s) * 0.5); /* --- THIS LINE WAS CHANGED --- */
   }
 
   .b {
-    transform-origin: center;
-    text-align: center;
-    flex-shrink: 0;
-    max-width: 90%;
-    padding: 0 5px;
+      transform-origin: center; /* Ensures scaling is from the center on mobile */
+      text-align: center;
+      flex-shrink: 0;
+      width: auto;
+      max-width: 90%;
+      padding: 0 5px;
   }
 }
 
 @media (max-width: 480px) {
   :root {
-    --s: 37.5px;
+      --s: 37.5px;
   }
 
   .b-c {
-    gap: 0;
+      gap: 0;
   }
 
   .b {
-    max-width: 95%;
-    padding: 0 2px;
+      max-width: 95%;
+      padding: 0 2px;
   }
 }
+/* --- END: Styles for copied old menu --- */
 
-/* ===============================
-   RAINING CAKES EFFECT
-   =============================== */
+/* --- START: Raining Cake Styles --- */
 #raining-cakes-container {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100vw;
-  height: 100dvh; /* ✅ dynamic viewport */
+  height: 100vh;
   pointer-events: none;
-  overflow: hidden;
-  background: transparent !important;
   z-index: 2;
+  overflow: hidden;
 }
 
 .small-cake {
@@ -229,11 +230,13 @@ a.b[href*="roblox.com"] {
 
 .small-cake-layer {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  background-blend-mode: multiply;
   -webkit-mask-size: contain;
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;
@@ -242,33 +245,24 @@ a.b[href*="roblox.com"] {
   mask-position: center;
   -webkit-mask-mode: alpha;
   mask-mode: alpha;
+  background-blend-mode: multiply;
 }
 
 .small-cake-base {
-  background-image: url("/assets/bday/cakebase.png");
-  -webkit-mask-image: url("/assets/bday/cakebase_mask.png");
-  mask-image: url("/assets/bday/cakebase_mask.png");
+  background-image: url('/assets/bday/cakebase.png');
+  -webkit-mask-image: url('/assets/bday/cakebase_mask.png');
+  mask-image: url('/assets/bday/cakebase_mask.png');
 }
 
 .small-cake-frosting {
-  background-image: url("/assets/bday/cakefrosting.png");
-  -webkit-mask-image: url("/assets/bday/cakefrosting_mask.png");
-  mask-image: url("/assets/bday/cakefrosting_mask.png");
+  background-image: url('/assets/bday/cakefrosting.png');
+  -webkit-mask-image: url('/assets/bday/cakefrosting_mask.png');
+  mask-image: url('/assets/bday/cakefrosting_mask.png');
 }
 
 .small-cake-cherries {
-  background-image: url("/assets/bday/cakecherries.png");
-  -webkit-mask-image: url("/assets/bday/cakecherries_mask.png");
-  mask-image: url("/assets/bday/cakecherries_mask.png");
+  background-image: url('/assets/bday/cakecherries.png');
+  -webkit-mask-image: url('/assets/bday/cakecherries_mask.png');
+  mask-image: url('/assets/bday/cakecherries_mask.png');
 }
-
-/* ===============================
-   FALLBACK FOR OLDER SAFARI
-   =============================== */
-@supports not (height: 100dvh) {
-  #scene-container,
-  #raining-cakes-container {
-    height: calc(100vh + env(safe-area-inset-top));
-    top: calc(-1 * env(safe-area-inset-top));
-  }
-}
+/* --- END: Raining Cake Styles --- */
