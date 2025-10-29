@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentNumShapes: 60, currentScaleMultiplier: 1.0, currentRotationSpeedMultiplier: 1.0,
         currentMovementSpeedMultiplier: 1.0, currentNumTransitionShapes: 10, currentBlurIntensity: 300,
         currentResolutionIndex: 2, previousResolutionIndex: 0,
-        currentBrightness: 40, currentContrast: 80, currentSaturation: 350, currentHueRotate: 0,
+        currentBrightness: 30, currentContrast: 70, currentSaturation: 350, currentHueRotate: 0,
         rawUnbalancedPalette: [], currentDominanceCap: 60,
         currentAccentBoost: 0.5, currentMinThreshold: 1, colorPalette: [], defaultColorPalette: [],
         targetBackgroundColor: '#181818', previousBackgroundColorForTransition: '#181818',
@@ -179,21 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
         img.onerror = reject;
         img.src = src;
     });
-
-    // --- THIS FUNCTION IS NEW ---
-    // Safely escapes HTML to prevent XSS when using .innerHTML
-    const escapeHTML = (str) => {
-        if (!str) return '';
-        return str.replace(/[&<>"']/g, (match) => {
-            return {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;'
-            }[match];
-        });
-    };
 
     // --- Core Functions ---
 
@@ -711,20 +696,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isPlaying) {
             const track = data.recenttracks.track[0];
-
-            // --- THIS SECTION IS MODIFIED ---
-            const rawTrackName = track.name?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Track';
-            const rawArtistName = track.artist?.["#text"]?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Artist';
-            
-            // 1. Escape HTML to prevent XSS
-            const safeTrackName = escapeHTML(rawTrackName.trim());
-            const safeArtistName = escapeHTML(rawArtistName.trim());
-
-            // 2. Replace spaces *within* the safe names with non-breaking spaces
-            const trackNameHTML = safeTrackName.replace(/ /g, '&nbsp;');
-            const artistNameHTML = safeArtistName.replace(/ /g, '&nbsp;');
-            // --- END MODIFICATION ---
-
+            const trackName = track.name?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Track';
+            const artistName = track.artist?.["#text"]?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Artist';
             const lastFmTrackUrl = track.url || (user ? `https://www.last.fm/user/${user}` : "#");
             let finalTrackUrl = lastFmTrackUrl; // Default to Last.fm
 
@@ -733,9 +706,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 artUrl = imgInfo["#text"];
             }
 
+            if (state.oldMenu.btn) {
+                state.oldMenu.btn.textContent = `Listening to ${trackName} by ${artistName}`;
+            }
+
             try {
                 // 1. Try to find Apple Music link
-                const searchTerm = `${rawTrackName} ${rawArtistName}`; // Use raw names for search
+                const searchTerm = `${trackName} ${artistName}`;
                 const appleMusicSearchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=song&limit=1&media=music`;
                 const response = await fetch(appleMusicSearchUrl);
                 
@@ -745,12 +722,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         finalTrackUrl = appleData.results[0].trackViewUrl; // Found Apple Music
                     } else {
                         // 2. Apple Music not found, create Spotify search link
-                        const spotifySearchTerm = `${rawTrackName} ${rawArtistName}`; // Use raw names for search
+                        const spotifySearchTerm = `${trackName} ${artistName}`;
                         finalTrackUrl = `https://open.spotify.com/search/${encodeURIComponent(spotifySearchTerm)}`;
                     }
                 } else {
                     // 2. Apple Music API failed, create Spotify search link
-                    const spotifySearchTerm = `${rawTrackName} ${rawArtistName}`; // Use raw names for search
+                    const spotifySearchTerm = `${trackName} ${artistName}`;
                     finalTrackUrl = `https://open.spotify.com/search/${encodeURIComponent(spotifySearchTerm)}`;
                 }
             } catch (error) {
@@ -760,33 +737,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (state.oldMenu.btn) {
-                // --- THIS SECTION IS MODIFIED ---
-                // 3. Use .innerHTML to set the content
-                state.oldMenu.btn.innerHTML = `Listening to ${trackNameHTML} by ${artistNameHTML}`;
                 state.oldMenu.btn.href = finalTrackUrl;
-                // --- END MODIFICATION ---
             }
 
         } else {
             // Not playing
             if (state.oldMenu.btn) {
-                // --- THIS SECTION IS MODIFIED ---
-                state.oldMenu.innerHTML = "Last.fm"; // Use innerHTML for consistency
+                state.oldMenu.btn.textContent = "Last.fm";
                 state.oldMenu.btn.href = user ? `https://www.last.fm/user/${user}` : "#";
-                // --- END MODIFICATION ---
             }
         }
         
         // Update favicon regardless of playing state
         updateOldMenuFavicon(artUrl, isPlaying);
-
-        const scrollContainer = document.querySelector('.b-c');
-        if (scrollContainer) {
-            scrollContainer.scrollTo({
-                top: scrollContainer.scrollHeight,
-                behavior: 'smooth'
-            });
-        }
     }
 
 

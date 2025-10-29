@@ -1,57 +1,62 @@
-/* --- GLOBAL VARIABLES --- */
 :root {
-  --s: clamp(37.5px, 5vw, 75px);
+  --s: 75px; /* For old menu positioning and sizing */
+  /* Removed Material You variables */
 }
 
-/* --- GLOBAL RESET --- */
-html, body {
-  margin: 0;
-  padding: 0;
-  background-color: #121212;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #EAEAEA;
-  overflow-x: hidden;
-  overflow-y: visible;
-}
 
-/* --- SCENE CONTAINER --- */
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #121212;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #EAEAEA; /* Default text color, primarily for old menu */
+}
 #scene-container {
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 0;
-  overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    overflow: hidden;
+}
+#scene-container.no-transition::before {
+    transition: none !important;
+}
+.blur-layer { /* Style for the blur wrapper divs */
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+#blur-layer-1 {
+    /* Styles for scaling applied by JS if blur is active */
+    width: 100%; height: 100%;
+    top: 0; left: 0;
 }
 
-.blur-layer {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
+/* Removed overlay styles (#scene-container::before, #scene-container.light-bg::before) */
+
+canvas, .small-cake-layer { /* Combined image-rendering */
+    display: block;
+    image-rendering: pixelated; /* Modern browsers */
+    image-rendering: -moz-crisp-edges; /* Firefox */
+    image-rendering: crisp-edges; /* Older spec */
 }
 
-/* --- CANVAS --- */
-canvas, .small-cake-layer {
-  display: block;
-  image-rendering: pixelated;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: crisp-edges;
-}
+/* --- Removed all #debug-menu related styles --- */
 
-/* --- SIGNATURE --- */
+/* --- START: Styles for copied old menu --- */
 .signature-container {
   position: fixed;
   top: var(--s);
   left: var(--s);
-  z-index: 3;
+  z-index: 3; /* Ensure it's above the main scene */
   font-family: Fustat, sans-serif;
 }
 
@@ -59,69 +64,64 @@ canvas, .small-cake-layer {
   height: var(--s);
   width: auto;
   user-select: none;
-  opacity: 0.8;
+  opacity: .8;
   filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
   pointer-events: none;
 }
 
-/* --- BUTTON CONTAINER --- */
-.b-c {
+/* .cls-1 defined in SVG, JS overrides fill */
+
+.b-c { /* Button container for old menu links */
   position: fixed;
   top: calc(2 * var(--s));
   left: var(--s);
-  right: var(--s);
-  z-index: 3;
-
+  right: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  z-index: 3;
   gap: 0;
-
   padding-top: 150px;
-  padding-bottom: calc(var(--s) * 0.5);
+  padding-bottom: calc(var(--s) * 0.5); /* --- THIS LINE WAS CHANGED --- */
   max-height: calc(100vh - (2 * var(--s)));
   overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  overscroll-behavior: contain;
-
-  /* 🟢 Fade starts right under signature */
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    black calc(var(--s) * 0.9)
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    black calc(var(--s) * 0.9)
-  );
-
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
+  mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   box-sizing: border-box;
   font-family: Fustat, sans-serif;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
 }
 
 .b-c::-webkit-scrollbar {
-  display: none;
+  display: none; /* WebKit */
 }
 
-/* --- BUTTONS --- */
-.b {
+.b { /* Individual links in the old menu */
   opacity: .8;
+  
+  /* --- KEY CHANGES HERE --- */
+  /* A very bouncy "jello" timing function */
   --jello-bezier: cubic-bezier(0.68, -0.55, 0.27, 1.55);
-  --jello-duration: 0.4s;
-  transition: opacity var(--jello-duration) var(--jello-bezier),
-              transform var(--jello-duration) var(--jello-bezier),
+  --jello-duration: 0.4s; /* Faster duration */
+  
+  /* Apply the jello transition to all properties JS will change */
+  transition: opacity var(--jello-duration) var(--jello-bezier), 
+              transform var(--jello-duration) var(--jello-bezier), 
               font-weight var(--jello-duration) var(--jello-bezier);
-  margin: 0;
+              /* Note: We are now transitioning 'transform' */
+  
+  /* Ensure base margins are 0 to keep zero spacing */
+  margin-top: 0;
+  margin-bottom: 0;
+  /* --- END KEY CHANGES --- */
+  
   font-size: var(--s);
   cursor: pointer;
   transform-origin: left;
   text-align: left;
   text-decoration: none;
-  color: inherit;
+  color: inherit; /* JS will set it */
   max-width: 80vw;
   box-sizing: border-box;
   padding: 0 10px;
@@ -132,87 +132,85 @@ canvas, .small-cake-layer {
   font-weight: 300;
   text-shadow: 0 2px 10px rgba(0,0,0,0.3);
   position: relative;
+}
+
+.b:not(#lastfm-button) {
   line-height: 1.5;
+}
+
+a.b[href*="roblox.com"] {
+  line-height: 2;
 }
 
 .b:hover {
   opacity: 1;
-  transform: scale(1.1);
+  /* We only apply scale here. JS handles the neighbors' translation */
+  transform: scale(1.1); 
   font-weight: 700;
+  
+  /* --- KEY CHANGES HERE --- */
+  /* NO margins or translations applied here */
 }
 
-/* --- FIX: Last.fm button alignment --- */
-#lastfm-button {
-  display: flex;
-  align-items: center;
-  min-height: calc(var(--s) * 1.3);
-  line-height: 1.4;
+#lastfm-button { /* Specific style for the Last.fm button */
+  word-wrap: break-word;
   white-space: normal;
 }
 
-/* --- MEDIA QUERIES --- */
+/* --- Removed Corner Image Styles --- */
+
+/* Media Queries for the old menu elements */
 @media (max-width: 768px) {
-  :root { --s: 37.5px; }
+  :root {
+      --s: 37.5px;
+  }
 
   .signature-container {
-    left: 50%;
-    transform: translateX(-50%);
-    top: var(--s);
+      left: 50%;
+      transform: translateX(-50%);
+      top: var(--s);
   }
 
   .b-c {
-    flex-direction: column;
-    align-items: center;
-    left: 0;
-    right: 0;
-    width: 100%;
-
-    /* ⬇️ lowered button section on mobile */
-    padding-top: calc(var(--s) * 2.2);
-    padding-bottom: calc(var(--s) * 0.8);
-    max-height: calc(100vh - (2 * var(--s)));
-
-    -webkit-mask-image: linear-gradient(
-      to bottom,
-      transparent 0,
-      black calc(var(--s) * 0.9)
-    );
-    mask-image: linear-gradient(
-      to bottom,
-      transparent 0,
-      black calc(var(--s) * 0.9)
-    );
+      flex-direction: column;
+      align-items: center;
+      left: 0;
+      transform: none;
+      bottom: 0;
+      justify-content: center;
+      width: 100%;
+      padding-top: calc(var(--s) / 2);
+      /* Add bottom padding for mobile too */
+      padding-bottom: calc(var(--s) * 0.5); /* --- THIS LINE WAS CHANGED --- */
   }
 
   .b {
-    transform-origin: center;
-    text-align: center;
-    flex-shrink: 0;
-    width: auto;
-    max-width: 90%;
-    padding: 0 5px;
-  }
-
-  #lastfm-button {
-    justify-content: center;
-    min-height: calc(var(--s) * 1.4);
+      transform-origin: center; /* Ensures scaling is from the center on mobile */
+      text-align: center;
+      flex-shrink: 0;
+      width: auto;
+      max-width: 90%;
+      padding: 0 5px;
   }
 }
 
 @media (max-width: 480px) {
-  .b-c { gap: 0; }
-
-  .b {
-    max-width: 95%;
-    padding: 0 2px;
+  :root {
+      --s: 37.5px;
   }
 
   .b-c {
-    padding-top: calc(var(--s) * 2.5); /* slightly lower on very small screens */
+      gap: 0;
+  }
+
+  .b {
+      max-width: 95%;
+      padding: 0 2px;
   }
 }
+/* --- END: Styles for copied old menu --- */
 
-/* --- RAINING CAKE EFFECTS --- */
+/* --- START: Raining Cake Styles --- */
 #raining-cakes-container {
   position: fixed;
   top: 0;
@@ -267,3 +265,4 @@ canvas, .small-cake-layer {
   -webkit-mask-image: url('/assets/bday/cakecherries_mask.png');
   mask-image: url('/assets/bday/cakecherries_mask.png');
 }
+/* --- END: Raining Cake Styles --- */
