@@ -6,6 +6,7 @@
     <title>drake lol</title>
     <link href="https://fonts.googleapis.com/css2?family=Fustat:wght@300;400;700&display=swap" rel="stylesheet">
     <meta name="description" content="my personal website with some of my links">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="icon" href="./assets/favicon/achtsquare_trans_128.png" type="image/png">
     <meta name="theme-color" content="#000000">
     <link rel="stylesheet" href="styles.css">
@@ -50,5 +51,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/two.js/0.8.12/two.min.js" defer></script>
     <script src="script.js" defer></script>
+    <script>
+function fixVH() {
+  document.documentElement.style.setProperty('--real100vh', `${window.innerHeight}px`);
+}
+fixVH();
+window.addEventListener('resize', fixVH);
+window.addEventListener('orientationchange', fixVH);
+</script>
 </body>
 </html>

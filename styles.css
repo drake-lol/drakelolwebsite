@@ -1,8 +1,8 @@
 :root {
   --s: 75px; /* For old menu positioning and sizing */
   /* Removed Material You variables */
+  --real100vh: 100vh; /* dynamic viewport height variable */
 }
-
 
 body {
     margin: 0;
@@ -15,6 +15,7 @@ body {
     font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: #EAEAEA; /* Default text color, primarily for old menu */
 }
+
 #scene-container {
     width: 100vw;
     height: 100vh;
@@ -27,6 +28,7 @@ body {
 #scene-container.no-transition::before {
     transition: none !important;
 }
+
 .blur-layer { /* Style for the blur wrapper divs */
     width: 100%;
     height: 100%;
@@ -101,20 +103,15 @@ canvas, .small-cake-layer { /* Combined image-rendering */
   opacity: .8;
   
   /* --- KEY CHANGES HERE --- */
-  /* A very bouncy "jello" timing function */
   --jello-bezier: cubic-bezier(0.68, -0.55, 0.27, 1.55);
-  --jello-duration: 0.4s; /* Faster duration */
+  --jello-duration: 0.4s;
   
-  /* Apply the jello transition to all properties JS will change */
   transition: opacity var(--jello-duration) var(--jello-bezier), 
               transform var(--jello-duration) var(--jello-bezier), 
               font-weight var(--jello-duration) var(--jello-bezier);
-              /* Note: We are now transitioning 'transform' */
   
-  /* Ensure base margins are 0 to keep zero spacing */
   margin-top: 0;
   margin-bottom: 0;
-  /* --- END KEY CHANGES --- */
   
   font-size: var(--s);
   cursor: pointer;
@@ -144,20 +141,14 @@ a.b[href*="roblox.com"] {
 
 .b:hover {
   opacity: 1;
-  /* We only apply scale here. JS handles the neighbors' translation */
   transform: scale(1.1); 
   font-weight: 700;
-  
-  /* --- KEY CHANGES HERE --- */
-  /* NO margins or translations applied here */
 }
 
-#lastfm-button { /* Specific style for the Last.fm button */
+#lastfm-button {
   word-wrap: break-word;
   white-space: normal;
 }
-
-/* --- Removed Corner Image Styles --- */
 
 /* Media Queries for the old menu elements */
 @media (max-width: 768px) {
@@ -180,12 +171,11 @@ a.b[href*="roblox.com"] {
       justify-content: center;
       width: 100%;
       padding-top: calc(var(--s) / 2);
-      /* Add bottom padding for mobile too */
-      padding-bottom: calc(var(--s) * 0.5); /* --- THIS LINE WAS CHANGED --- */
+      padding-bottom: calc(var(--s) * 0.5);
   }
 
   .b {
-      transform-origin: center; /* Ensures scaling is from the center on mobile */
+      transform-origin: center;
       text-align: center;
       flex-shrink: 0;
       width: auto;
@@ -266,3 +256,21 @@ a.b[href*="roblox.com"] {
   mask-image: url('/assets/bday/cakecherries_mask.png');
 }
 /* --- END: Raining Cake Styles --- */
+
+
+/* --- SAFARI / iOS FULLSCREEN FIX --- */
+
+/* Enable edge-to-edge layout */
+@supports (-webkit-touch-callout: none) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  #scene-container,
+  #raining-cakes-container {
+    height: calc(var(--real100vh) + env(safe-area-inset-top) + env(safe-area-inset-bottom));
+  }
+}
