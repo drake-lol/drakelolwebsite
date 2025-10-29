@@ -18,7 +18,6 @@ body {
   background-attachment: fixed;
   background-position: center;
   background-size: cover;
-  /* IMPORTANT: no safe-area padding on body, it clips fixed children */
   font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #eaeaea;
   display: flex;
@@ -28,27 +27,24 @@ body {
 }
 
 /* ===============================
-   SCENE CONTAINER & CANVAS
+   SCENE CONTAINER & CANVAS (overscan fix)
    =============================== */
-/* Full-bleed under-address-bar technique:
-   Use top/bottom anchors with a negative top offset equal to the safe area. */
 #scene-container {
   position: fixed;
-  left: 0;
-  right: 0;
-  top: calc(-1 * env(safe-area-inset-top));
-  bottom: 0;
+  top: -50px;
+  left: -50px;
+  right: -50px;
+  bottom: -50px;
   z-index: 0;
-  overflow: hidden;
+  overflow: hidden; /* prevent scrollbars */
 }
 
-/* Ensure the <canvas> fills the container box.
-   (Your JS should set the drawing buffer size; this is the CSS box.) */
+/* stretch the canvas 50px beyond each side */
 #scene-container canvas {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  width: calc(100vw + 100px);
+  height: calc(100vh + 100px);
   display: block;
 }
 
@@ -94,7 +90,6 @@ body {
   gap: 0;
   padding-top: 150px;
   padding-bottom: calc(var(--s) * 0.5);
-  /* Use viewport height for scroll area — container already extends under bar */
   max-height: calc(100vh - (2 * var(--s)));
   overflow-y: auto;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
@@ -203,14 +198,14 @@ a.b[href*="roblox.com"] {
 }
 
 /* ===============================
-   RAINING CAKES EFFECT
+   RAINING CAKES EFFECT (also overscanned)
    =============================== */
 #raining-cakes-container {
   position: fixed;
-  left: 0;
-  right: 0;
-  top: calc(-1 * env(safe-area-inset-top));
-  bottom: 0;
+  top: -50px;
+  left: -50px;
+  right: -50px;
+  bottom: -50px;
   pointer-events: none;
   overflow: hidden;
   z-index: 2;
@@ -255,14 +250,4 @@ a.b[href*="roblox.com"] {
   background-image: url("/assets/bday/cakecherries.png");
   -webkit-mask-image: url("/assets/bday/cakecherries_mask.png");
   mask-image: url("/assets/bday/cakecherries_mask.png");
-}
-
-/* ===============================
-   SAFARI TWEAKS (optional)
-   =============================== */
-@supports (-webkit-touch-callout: none) {
-  /* If you want bottom content safe padding for interactive elements: */
-  body {
-    /* padding-bottom: env(safe-area-inset-bottom); */
-  }
 }
