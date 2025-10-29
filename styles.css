@@ -1,9 +1,6 @@
 :root {
-  --s: 75px; /* For old menu positioning and sizing */
-  /* Removed Material You variables */
+  --s: clamp(37.5px, 5vw, 75px);
 }
-
-
 body {
     margin: 0;
     overflow: hidden;
