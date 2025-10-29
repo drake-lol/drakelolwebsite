@@ -1,6 +1,6 @@
 /* --- GLOBAL VARIABLES --- */
 :root {
-  --s: clamp(37.5px, 5vw, 75px); /* fluid scaling */
+  --s: clamp(37.5px, 5vw, 75px);
 }
 
 /* --- GLOBAL RESET --- */
@@ -8,7 +8,7 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  height: 100dvh;          /* dynamic full viewport height on iOS Safari */
+  height: 100dvh;
   width: 100vw;
   background-color: #121212;
   display: flex;
@@ -17,34 +17,25 @@ html, body {
   font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #EAEAEA;
   -webkit-overflow-scrolling: touch;
-  position: fixed;          /* ensure we fully extend under bars */
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-
-/* --- SAFE AREA HANDLING --- */
-html, body, #scene-container {
-  padding: 0;
-  margin: 0;
-  /* explicitly ignore safe-area paddings */
-  height: 110dvh;
-  width: 110vw;
+  position: fixed;
   inset: 0;
-  position: fixed;
 }
 
-/* --- SCENE BACKGROUND --- */
+/* --- SCENE CONTAINER --- */
 #scene-container {
-  width: 100vw;
-  height: 100dvh;
   position: fixed;
-  top: 0;
-  left: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* anchor center of container to center of viewport */
+  width: 120vw;
+  height: 120dvh;
   z-index: 0;
   overflow: hidden;
-  transform: translateZ(0);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end; /* optional, keeps visual bias to bottom if you prefer */
+  transform-origin: center center;
+  will-change: transform;
 }
 
 #scene-container.no-transition::before {
@@ -100,20 +91,27 @@ canvas, .small-cake-layer {
   bottom: var(--s);
   left: var(--s);
   right: var(--s);
+
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   align-items: flex-start;
   z-index: 3;
   gap: 0;
+
   padding-top: 0;
-  padding-bottom: calc(1 * var(--s)); /* increased padding to avoid clipping */
+  padding-bottom: calc(1 * var(--s)); /* keep existing inner spacing */
+
+  /* manually move it down by its padding so the last button truly aligns to bottom edge */
+  transform: translateY(calc(1 * var(--s)));
+
   overflow-y: auto;
   overflow-x: visible;
   box-sizing: border-box;
   font-family: Fustat, sans-serif;
   scrollbar-width: none;
   -ms-overflow-style: none;
+
   -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
 }
@@ -160,9 +158,6 @@ canvas, .small-cake-layer {
   font-weight: 700;
 }
 
-/* --- LAST.FM BUTTON --- */
-#lastfm-button {}
-
 /* --- MEDIA QUERIES --- */
 @media (max-width: 768px) {
   .signature-container {
@@ -207,13 +202,16 @@ canvas, .small-cake-layer {
 /* --- RAINING CAKE EFFECTS --- */
 #raining-cakes-container {
   position: fixed;
-  top: 0;
+  bottom: 0;
   left: 0;
   width: 100vw;
   height: 100dvh;
   pointer-events: none;
   z-index: 2;
   overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
 }
 
 .small-cake {
