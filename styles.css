@@ -11,31 +11,22 @@
 html,
 body {
   margin: 0;
-  height: 100%;
+  padding: 0;
   width: 100%;
+  height: 100%;
   overflow: hidden;
-
-  /* use background shorthand that Safari can expand behind bars */
-  background:
-    linear-gradient(135deg, #6b6bff, #ff6b6b)
-      0 0 / cover no-repeat fixed,
-    #121212;
+  background: linear-gradient(135deg, #6b6bff, #ff6b6b);
   background-position: center;
-  background-attachment: fixed;
   background-size: cover;
-
-  /* 👇 tell Safari it can paint into the safe area */
-  padding-top: env(safe-area-inset-top);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-
+  background-attachment: fixed;
   font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #eaeaea;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+
+  /* 👇 crucial line for Safari 17 + */
+  min-height: 100dvh;
 }
 
 /* ===============================
@@ -43,29 +34,18 @@ body {
    =============================== */
 #scene-container {
   position: fixed;
-  top: calc(-1 * env(safe-area-inset-top)); /* explicitly push upward */
-  left: 0;
-  width: 100%;
-  height: calc(100vh + env(safe-area-inset-top));
+  inset: 0;
+  width: 100vw;
+  height: 100dvh; /* ✅ use dynamic viewport height */
   z-index: 0;
   overflow: hidden;
-
-  /* duplicate background here in case body isn’t drawn behind UI */
-  background:
-    linear-gradient(135deg, #6b6bff, #ff6b6b)
-      0 0 / cover no-repeat fixed,
-    #121212;
-  background-position: center;
-  background-attachment: fixed;
-  background-size: cover;
 }
 
 #scene-container canvas {
   position: absolute;
-  top: calc(-1 * env(safe-area-inset-top));
-  left: 0;
-  width: 100%;
-  height: calc(100vh + env(safe-area-inset-top));
+  inset: 0;
+  width: 100vw;
+  height: 100dvh; /* ✅ extend fully behind liquid-glass bar */
   display: block;
 }
 
@@ -111,7 +91,7 @@ body {
   gap: 0;
   padding-top: 150px;
   padding-bottom: calc(var(--s) * 0.5);
-  max-height: calc(100vh - (2 * var(--s)));
+  max-height: calc(100dvh - (2 * var(--s)));
   overflow-y: auto;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
@@ -223,10 +203,9 @@ a.b[href*="roblox.com"] {
    =============================== */
 #raining-cakes-container {
   position: fixed;
-  top: calc(-1 * env(safe-area-inset-top));
-  left: 0;
-  width: 100%;
-  height: calc(100vh + env(safe-area-inset-top));
+  inset: 0;
+  width: 100vw;
+  height: 100dvh; /* ✅ dynamic viewport */
   pointer-events: none;
   overflow: hidden;
   z-index: 2;
@@ -271,4 +250,15 @@ a.b[href*="roblox.com"] {
   background-image: url("/assets/bday/cakecherries.png");
   -webkit-mask-image: url("/assets/bday/cakecherries_mask.png");
   mask-image: url("/assets/bday/cakecherries_mask.png");
+}
+
+/* ===============================
+   FALLBACK FOR OLDER SAFARI
+   =============================== */
+@supports not (height: 100dvh) {
+  #scene-container,
+  #raining-cakes-container {
+    height: calc(100vh + env(safe-area-inset-top));
+    top: calc(-1 * env(safe-area-inset-top));
+  }
 }
