@@ -1,6 +1,7 @@
 /* --- GLOBAL VARIABLES --- */
 :root {
   --s: clamp(37.5px, 5vw, 75px);
+  --menu-shift: calc(1.45 * var(--s)); /* slightly lower than before */
 }
 
 /* --- GLOBAL RESET --- */
@@ -21,25 +22,23 @@ html, body {
   inset: 0;
 }
 
-/* --- SCENE CONTAINER --- */
+/* --- SCENE CONTAINER (centered, bottom-biased) --- */
 #scene-container {
   position: fixed;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%); /* anchor center of container to center of viewport */
-  width: 120vw;
-  height: 120dvh;
+  transform: translate(-50%, -50%);
+  width: 100vw;
+  height: 100dvh;
   z-index: 0;
   overflow: hidden;
+
   display: flex;
   justify-content: center;
-  align-items: flex-end; /* optional, keeps visual bias to bottom if you prefer */
+  align-items: flex-end;
+
   transform-origin: center center;
   will-change: transform;
-}
-
-#scene-container.no-transition::before {
-  transition: none !important;
 }
 
 /* --- BLUR LAYERS --- */
@@ -100,14 +99,17 @@ canvas, .small-cake-layer {
   gap: 0;
 
   padding-top: 0;
-  padding-bottom: calc(1 * var(--s)); /* keep existing inner spacing */
+  padding-bottom: var(--menu-shift);
 
-  /* manually move it down by its padding so the last button truly aligns to bottom edge */
-  transform: translateY(calc(1 * var(--s)));
+  /* move the entire container further down */
+  transform: translateY(var(--menu-shift));
 
+  /* allow native manual scrolling */
   overflow-y: auto;
   overflow-x: visible;
+  -webkit-overflow-scrolling: touch; /* enables smooth iOS scrolling */
   box-sizing: border-box;
+
   font-family: Fustat, sans-serif;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -172,10 +174,10 @@ canvas, .small-cake-layer {
     align-items: flex-start;
     left: var(--s);
     right: var(--s);
-    padding-bottom: calc(1 * var(--s));
+    padding-bottom: var(--menu-shift);
+    transform: translateY(var(--menu-shift));
     justify-content: flex-end;
     flex-direction: column;
-    transform: none;
   }
 
   .b {
