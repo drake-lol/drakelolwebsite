@@ -1281,46 +1281,48 @@ document.addEventListener('DOMContentLoaded', () => {
     resetLastFmInterval();
 
 // -------------------------------------------------------------
-// ✅ SAFARI / iOS DYNAMIC VIEWPORT FIX — Two.js-safe version
+// ✅ UNIVERSAL VIEWPORT + CANVAS FIX (Safari + Desktop)
 // -------------------------------------------------------------
-function resizeToDynamicViewport() {
+function syncTwoViewport() {
   const sceneContainer = document.getElementById('scene-container');
-  if (!sceneContainer || !state.twoJsCanvas) return;
+  if (!sceneContainer || !two || !state.twoJsCanvas) return;
 
-  // Use visualViewport on iOS so we include the area behind the address bar
-  const vw = Math.round(window.innerWidth);
-  const vh = Math.round(window.visualViewport ? window.visualViewport.height : window.innerHeight);
+  // Get actual usable viewport height (includes under address bar)
+  const vw = window.innerWidth;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
 
-  // Size the container box
-  sceneContainer.style.width  = vw + 'px';
-  sceneContainer.style.height = vh + 'px';
+  // Update container sizing
+  sceneContainer.style.width = `${vw}px`;
+  sceneContainer.style.height = `${vh}px`;
+  sceneContainer.style.background = 'transparent';
 
-  // IMPORTANT: resize Two.js via its renderer, not by touching canvas.width/height
-  try {
-    const ratio = window.devicePixelRatio || 1;
-    if (two && two.renderer && typeof two.renderer.setSize === 'function') {
-      // Some Two.js builds accept (w, h, ratio); if your build ignores ratio it’s fine.
-      two.renderer.setSize(vw, vh, ratio);
-    }
-    // Keep Two's internal width/height in sync for your layout logic
-    two.width  = vw;
-    two.height = vh;
-
-    // Let Two.js react to the new size (camera/projection updates, etc.)
-    if (typeof two.trigger === 'function') two.trigger('resize');
-  } catch (e) {
-    console.warn('Two.js resize failed:', e);
+  // Resize Two.js safely
+  if (typeof two.renderer.setSize === 'function') {
+    two.renderer.setSize(vw, vh);
   }
+  two.width = vw;
+  two.height = vh;
 
-  // CSS size so it actually fills behind the liquid-glass bar
-  state.twoJsCanvas.style.width  = '100vw';
+  // Make sure the canvas fills and stays transparent
+  state.twoJsCanvas.style.width = '100vw';
   state.twoJsCanvas.style.height = '100dvh';
+  state.twoJsCanvas.style.background = 'transparent';
+
+  // Trigger Two.js to re-compute projection
+  if (typeof two.trigger === 'function') two.trigger('resize');
 }
 
-// Run once and on viewport changes (rotation, bar show/hide)
-resizeToDynamicViewport();
-window.addEventListener('resize', resizeToDynamicViewport);
-window.visualViewport?.addEventListener('resize', resizeToDynamicViewport);
-window.visualViewport?.addEventListener('scroll', resizeToDynamicViewport);
+// Run once and on viewport changes
+syncTwoViewport();
+window.addEventListener('resize', syncTwoViewport);
+window.visualViewport?.addEventListener('resize', syncTwoViewport);
+window.visualViewport?.addEventListener('scroll', syncTwoViewport);
+
+// Resume animation if iOS pauses raf after address bar hides
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && typeof two.play === 'function') {
+    two.play();
+  }
+});
 
 });
