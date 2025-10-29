@@ -2,14 +2,15 @@
    GLOBAL VARIABLES
    =============================== */
 :root {
-  --s: 75px; /* For old menu positioning and sizing */
-  --real100vh: 100dvh; /* Dynamic viewport height variable for Safari + modern browsers */
+  --s: 75px; /* for menu sizing and positioning */
+  --real100vh: 100dvh; /* dynamic viewport height for Safari + modern browsers */
 }
 
 /* ===============================
    BASE LAYOUT
    =============================== */
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -21,17 +22,17 @@ html, body {
   align-items: center;
   min-height: var(--real100vh);
   font-family: 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #EAEAEA;
+  color: #eaeaea;
 }
 
-/* Scene container and main canvas layer */
+/* Scene container and background */
 #scene-container {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: var(--real100vh);
-  z-index: 0;
   overflow: hidden;
+  z-index: 0;
 }
 
 #scene-container.no-transition::before {
@@ -46,8 +47,6 @@ html, body {
 #blur-layer-1 {
   width: 100%;
   height: 100%;
-  top: 0;
-  left: 0;
 }
 
 canvas,
@@ -59,7 +58,7 @@ canvas,
 }
 
 /* ===============================
-   OLD MENU STYLES
+   SIGNATURE + MENU
    =============================== */
 .signature-container {
   position: fixed;
@@ -72,9 +71,9 @@ canvas,
 .signature {
   height: var(--s);
   width: auto;
-  user-select: none;
   opacity: 0.8;
   filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.3));
+  user-select: none;
   pointer-events: none;
 }
 
@@ -86,18 +85,18 @@ canvas,
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  z-index: 3;
   gap: 0;
+  z-index: 3;
   padding-top: 150px;
   padding-bottom: calc(var(--s) * 0.5);
   max-height: calc(var(--real100vh) - (2 * var(--s)));
   overflow-y: auto;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
-  mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
   box-sizing: border-box;
   font-family: Fustat, sans-serif;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
+  mask-image: linear-gradient(to bottom, transparent 0px, black var(--s));
 }
 
 .b-c::-webkit-scrollbar {
@@ -106,28 +105,33 @@ canvas,
 
 .b {
   opacity: 0.8;
-  --jello-bezier: cubic-bezier(0.68, -0.55, 0.27, 1.55);
-  --jello-duration: 0.4s;
-  transition: opacity var(--jello-duration) var(--jello-bezier),
-    transform var(--jello-duration) var(--jello-bezier),
-    font-weight var(--jello-duration) var(--jello-bezier);
   margin: 0;
+  padding: 0 10px;
   font-size: var(--s);
+  font-weight: 300;
   cursor: pointer;
   transform-origin: left;
   text-align: left;
   text-decoration: none;
   color: inherit;
-  max-width: 80vw;
-  box-sizing: border-box;
-  padding: 0 10px;
   text-transform: lowercase;
+  max-width: 80vw;
   user-select: none;
   -webkit-user-drag: none;
   pointer-events: auto;
-  font-weight: 300;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   position: relative;
+
+  transition:
+    opacity 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55),
+    transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55),
+    font-weight 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+.b:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  font-weight: 700;
 }
 
 .b:not(#lastfm-button) {
@@ -136,12 +140,6 @@ canvas,
 
 a.b[href*="roblox.com"] {
   line-height: 2;
-}
-
-.b:hover {
-  opacity: 1;
-  transform: scale(1.1);
-  font-weight: 700;
 }
 
 #lastfm-button {
@@ -167,10 +165,10 @@ a.b[href*="roblox.com"] {
     flex-direction: column;
     align-items: center;
     left: 0;
-    transform: none;
     bottom: 0;
-    justify-content: center;
     width: 100%;
+    transform: none;
+    justify-content: center;
     padding-top: calc(var(--s) / 2);
     padding-bottom: calc(var(--s) * 0.5);
   }
@@ -179,7 +177,6 @@ a.b[href*="roblox.com"] {
     transform-origin: center;
     text-align: center;
     flex-shrink: 0;
-    width: auto;
     max-width: 90%;
     padding: 0 5px;
   }
@@ -201,7 +198,7 @@ a.b[href*="roblox.com"] {
 }
 
 /* ===============================
-   RAINING CAKE STYLES
+   RAINING CAKES EFFECT
    =============================== */
 #raining-cakes-container {
   position: fixed;
@@ -209,8 +206,8 @@ a.b[href*="roblox.com"] {
   width: 100vw;
   height: var(--real100vh);
   pointer-events: none;
-  z-index: 2;
   overflow: hidden;
+  z-index: 2;
 }
 
 .small-cake {
@@ -225,6 +222,7 @@ a.b[href*="roblox.com"] {
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
+  background-blend-mode: multiply;
   -webkit-mask-size: contain;
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;
@@ -233,7 +231,6 @@ a.b[href*="roblox.com"] {
   mask-position: center;
   -webkit-mask-mode: alpha;
   mask-mode: alpha;
-  background-blend-mode: multiply;
 }
 
 .small-cake-base {
@@ -255,10 +252,13 @@ a.b[href*="roblox.com"] {
 }
 
 /* ===============================
-   SAFARI FIX: Stretch Under Address Bar
+   SAFARI FIXES: Stretch Under Address Bar
    =============================== */
+
+/* Modern iOS (15.4+ with dvh support) */
 @supports (-webkit-touch-callout: none) {
-  html, body {
+  html,
+  body {
     min-height: 100dvh;
     background-color: #121212;
   }
@@ -267,9 +267,8 @@ a.b[href*="roblox.com"] {
   #raining-cakes-container {
     position: fixed;
     inset: 0;
-    width: 100vw;
     height: 100dvh;
-    z-index: 0;
+    width: 100vw;
     overflow: hidden;
   }
 
@@ -278,11 +277,14 @@ a.b[href*="roblox.com"] {
   }
 }
 
-/* Legacy iOS Fallback */
+/* Legacy iOS fallback (pre-dvh) */
 @supports not (height: 100dvh) {
   #scene-container,
   #raining-cakes-container {
-    height: calc(100vh + env(safe-area-inset-top));
+    position: fixed;
     top: calc(-1 * env(safe-area-inset-top));
+    left: 0;
+    width: 100vw;
+    height: calc(100vh + env(safe-area-inset-top));
   }
 }
