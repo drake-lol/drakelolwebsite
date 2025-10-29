@@ -50,5 +50,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/two.js/0.8.12/two.min.js" defer></script>
     <script src="script.js" defer></script>
+    <script>
+  // Wait for the page content to be fully loaded
+  document.addEventListener("DOMContentLoaded", function() {
+    // Find the button container element
+    const buttonContainer = document.querySelector('.b-c');
+    
+    // Set its scroll position to the maximum (the bottom)
+    if (buttonContainer) {
+      buttonContainer.scrollTop = buttonContainer.scrollHeight;
+    }
+  });
+</script>
 </body>
 </html>
