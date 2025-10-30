@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentNumShapes: 60, currentScaleMultiplier: 1.0, currentRotationSpeedMultiplier: 1.0,
         currentMovementSpeedMultiplier: 1.0, currentNumTransitionShapes: 10, currentBlurIntensity: 300,
         currentResolutionIndex: 2, previousResolutionIndex: 0,
-        currentBrightness: 30, currentContrast: 70, currentSaturation: 350, currentHueRotate: 0,
+        currentBrightness: 30, currentContrast: 90, currentSaturation: 350, currentHueRotate: 0,
         rawUnbalancedPalette: [], currentDominanceCap: 60,
         currentAccentBoost: 0.5, currentMinThreshold: 1, colorPalette: [], defaultColorPalette: [],
         targetBackgroundColor: '#181818', previousBackgroundColorForTransition: '#181818',
