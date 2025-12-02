@@ -212,20 +212,41 @@ a.b[href*="roblox.com"] {
     left: 50%;
     transform: translateX(-50%);
     padding: var(--s);
+    /* Ensure signature stays on top visually */
+    pointer-events: none; 
   }
 
   .b-c {
+    /* RESET DESKTOP POSITIONING */
     position: fixed;
+    top: 0; 
     bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    left: 0;
+    transform: none; /* Remove the translateX since we are using width 100% */
+    
+    /* LAYOUT & SIZING */
     width: 100%;
+    height: 100vh; /* Take up full screen */
+    max-height: none; /* Remove desktop height limit */
+    
+    /* CENTERING */
+    display: flex;
+    flex-direction: column;
+    align-items: center; 
+    justify-content: center; /* Vertically centers the items */
+    
+    /* OFFSETS */
     padding: var(--s);
-    padding-top: calc(var(--s) / 2);
+    /* Calculate space for signature: 
+       Signature has 1 unit padding top + 1 unit height + 1 unit padding bottom 
+       = approx 3 * var(--s) to clear it completely. */
+    padding-top: calc(var(--s) * 3); 
+    
     box-sizing: border-box;
+    
+    /* Adjust mask to fade slightly at top (under signature) and bottom */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s), black 90%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0px, black var(--s), black 90%, transparent 100%);
   }
 
   .b {
@@ -234,7 +255,7 @@ a.b[href*="roblox.com"] {
     flex-shrink: 0;
     width: auto;
     max-width: 90%;
-    padding: 0 5px;
+    padding: 5px; /* Added slight vertical padding for touch targets */
   }
 }
 
