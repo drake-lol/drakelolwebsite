@@ -524,7 +524,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const minSize = isTransition ? 5 : 10;
 
         const baseSize = rand(minScreenDim * baseSizeFactorMin, minScreenDim * baseSizeFactorMax) * state.currentScaleMultiplier;
-        // Shapes get colors from state.colorPalette, which is already clamped
         const chosenColorItem = getRandomColorFromPaletteWeighted(state.colorPalette, { color: '#CCCCCC', weight: 1 });
 
         let newTwoShape, approxWidth, approxHeight;
@@ -560,7 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        newTwoShape.fill = chosenColorItem.color; // Use the (already clamped) color
+        newTwoShape.fill = chosenColorItem.color;
         newTwoShape.opacity = isTransition ? 0 : targetOpacity;
         newTwoShape.noStroke();
         newTwoShape.rotation = rand(0, Math.PI * 2);
@@ -574,36 +573,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const resolutionSpeedFactor = (RESOLUTIONS[state.currentResolutionIndex].width / BASE_RESOLUTION_WIDTH);
         const speed = baseSpeedValue * resolutionSpeedFactor * state.currentMovementSpeedMultiplier * speedFactor;
 
-        // --- UPDATED PLACEMENT LOGIC START ---
+        // --- PLACEMENT LOGIC ---
         if (state.isInitialShapeSpawn && !isTransition) {
-            // Pick a random spot anywhere on the canvas
-            // We use a small margin so they don't spawn half-clipped off the screen initially
-            const margin = Math.min(approxWidth, approxHeight); 
             const x = rand(0, two.width);
             const y = rand(0, two.height);
-            
             newTwoShape.translation.set(x, y);
 
-            // Give it a random velocity direction (0 to 360 degrees)
             const vAngle = Math.random() * Math.PI * 2;
             shapeData.vx = Math.cos(vAngle) * speed;
             shapeData.vy = Math.sin(vAngle) * speed;
         } else {
-            // Keep the original "spawn from edges" logic for new shapes
-            // that appear after the initial load.
             const offset = Math.max(approxWidth, approxHeight) * 0.7;
             const spawnConfig = SPAWN_CONFIGS[randInt(0, SPAWN_CONFIGS.length - 1)];
             newTwoShape.translation.set(spawnConfig.getX(two.width, two.height, offset), spawnConfig.getY(two.width, two.height, offset));
             shapeData.vx = spawnConfig.getVX(speed);
             shapeData.vy = spawnConfig.getVY(speed);
         }
-        // --- UPDATED PLACEMENT LOGIC END ---
 
         if (isTransition) {
             shapeData.spawnTime = performance.now();
             shapeData.isFadingIn = true;
             shapeData.targetOpacity = targetOpacity;
         }
+
+        // --- CURVING PROPERTIES (Modified) ---
+        // 50% chance to curve
+        if (Math.random() < 0.5) {
+            shapeData.curveFreq = rand(0.0003, 0.001); 
+            shapeData.curveAmp = rand(0.5, 2.5) * (baseSpeedValue * 100); 
+        } else {
+            // No curve = Amplitude 0
+            shapeData.curveFreq = 0; 
+            shapeData.curveAmp = 0; 
+        }
+        shapeData.curveOffset = rand(0, Math.PI * 2);
 
         if (!newTwoShape.parent) two.add(newTwoShape);
     }
@@ -1021,52 +1024,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const twoW = two.width, twoH = two.height;
 
-        // Background Color Transition (Target color is already clamped)
+        // Background Color Transition
         if (state.isBackgroundTransitioning) {
             const progress = Math.min((now - state.backgroundColorTransitionStartTime) / BACKGROUND_COLOR_TRANSITION_DURATION, 1);
-            const prevRgb = hexToRgb(state.previousBackgroundColorForTransition); // Previous might not be clamped, that's okay for transition source
-            const targetRgb = hexToRgb(state.targetBackgroundColor); // Target is clamped
-            state.currentAnimatedBackgroundColor = rgbToHex( // Resulting intermediate color might exceed clamp temporarily, clamped in relevant functions (M3, blur)
+            const prevRgb = hexToRgb(state.previousBackgroundColorForTransition);
+            const targetRgb = hexToRgb(state.targetBackgroundColor);
+            state.currentAnimatedBackgroundColor = rgbToHex(
                 prevRgb.r + (targetRgb.r - prevRgb.r) * progress,
                 prevRgb.g + (targetRgb.g - prevRgb.g) * progress,
                 prevRgb.b + (targetRgb.b - prevRgb.b) * progress
             );
             if (progress >= 1) {
                 state.isBackgroundTransitioning = false;
-                state.currentAnimatedBackgroundColor = state.targetBackgroundColor; // Ensure end state is clamped target
+                state.currentAnimatedBackgroundColor = state.targetBackgroundColor;
             }
         } else if (state.currentAnimatedBackgroundColor !== state.targetBackgroundColor) {
-            state.currentAnimatedBackgroundColor = state.targetBackgroundColor; // Ensure state reflects clamped target
+            state.currentAnimatedBackgroundColor = state.targetBackgroundColor;
         }
 
-        // Update Old Menu Theme (Uses clamping internally)
+        // Update Old Menu Theme
         if (state.currentAnimatedBackgroundColor !== state.previousFrameAnimatedBgColor) {
             updateOldMenuElementsStyle();
             updateOldMenuThemeMetaTag();
             state.previousFrameAnimatedBgColor = state.currentAnimatedBackgroundColor;
         }
 
-        // Update Blur (Uses clamping internally via clampColorLightness if needed)
+        // Update Blur
         if (state.twoJsCanvas) {
-             const bgColorForBlur = clampColorLightness(state.currentAnimatedBackgroundColor); // Clamp before applying to blur
-            const blurStateChanged = bgColorForBlur !== state.prevAnimatedBgColorForBlur; // Compare clamped versions
+             const bgColorForBlur = clampColorLightness(state.currentAnimatedBackgroundColor);
+            const blurStateChanged = bgColorForBlur !== state.prevAnimatedBgColorForBlur;
             if (blurStateChanged) {
-                 applyBlurEffect(bgColorForBlur); // Apply clamped color
-                 state.prevAnimatedBgColorForBlur = bgColorForBlur; // Store clamped color
+                 applyBlurEffect(bgColorForBlur);
+                 state.prevAnimatedBgColorForBlur = bgColorForBlur;
             }
         }
 
-
-        // Old Color Cleanup (Trigger) - Compares against clamped state.colorPalette
+        // Old Color Cleanup
         if (!state.cleanupTriggeredForCurrentPaletteChange && state.previousColorPaletteForCleanup.length > 0 && (now - state.paletteChangeTimestampForCleanup > CLEANUP_START_DELAY)) {
-            const currentPaletteSet = new Set(state.colorPalette.map(item => item.color.toUpperCase())); // Current palette is clamped
+            const currentPaletteSet = new Set(state.colorPalette.map(item => item.color.toUpperCase()));
             let shapesMoved = 0;
             for (let i = state.shapesData.length - 1; i >= 0; i--) {
                 const sd = state.shapesData[i];
                 if (sd.twoShape?.fill) {
-                    // Shape color might be from old unclamped palette
                     const shapeColor = sd.twoShape.fill.toUpperCase();
-                    // Check if old palette had it AND new clamped palette doesn't
                     if (state.previousColorPaletteForCleanup.includes(shapeColor) && !currentPaletteSet.has(shapeColor)) {
                         sd.isMarkedForCleanupScaling = true;
                         sd.cleanupScaleStartTime = now;
@@ -1077,11 +1077,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
-            if (shapesMoved > 0) adjustShapesArray(); // Refill with new clamped colors
+            if (shapesMoved > 0) adjustShapesArray();
             state.cleanupTriggeredForCurrentPaletteChange = true;
             state.previousColorPaletteForCleanup = [];
         }
-
 
         // Update Fading Shapes
         for (let i = state.fadingOutShapesData.length - 1; i >= 0; i--) {
@@ -1089,8 +1088,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (sd.twoShape) {
                 const progress = Math.min((now - sd.cleanupScaleStartTime) / sd.cleanupScaleDuration, 1);
                 sd.twoShape.opacity = 1 - easeInOutQuad(progress);
-                sd.twoShape.translation.x += sd.vx * state.currentMovementSpeedMultiplier;
-                sd.twoShape.translation.y += sd.vy * state.currentMovementSpeedMultiplier;
+                
+                // Also apply curves to fading shapes for consistency
+                const perpX = -sd.vy;
+                const perpY = sd.vx;
+                const sway = Math.sin(now * sd.curveFreq + sd.curveOffset) * sd.curveAmp;
+                
+                sd.twoShape.translation.x += (sd.vx + perpX * sway) * state.currentMovementSpeedMultiplier;
+                sd.twoShape.translation.y += (sd.vy + perpY * sway) * state.currentMovementSpeedMultiplier;
                 sd.twoShape.rotation += sd.rotationSpeed * state.currentRotationSpeedMultiplier;
 
                 if (progress >= 1) {
@@ -1109,7 +1114,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const sd = state.shapesData[i];
             if (sd.needsReinitialization) {
                 if (reinitCount < maxReinit && !sd.twoShape) {
-                    initializeShape(sd, false); // Gets clamped color
+                    initializeShape(sd, false);
                     reinitCount++;
                 }
                 continue;
@@ -1120,8 +1125,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const shape = sd.twoShape;
-            shape.translation.x += sd.vx * state.currentMovementSpeedMultiplier;
-            shape.translation.y += sd.vy * state.currentMovementSpeedMultiplier;
+
+            // --- MAIN SHAPE MOVEMENT & CURVING ---
+            // Calculate perpendicular vector (-vy, vx)
+            const perpX = -sd.vy;
+            const perpY = sd.vx;
+            // Calculate sine wave sway
+            const sway = Math.sin(now * sd.curveFreq + sd.curveOffset) * sd.curveAmp;
+
+            // Apply Velocity + Sway
+            shape.translation.x += (sd.vx + perpX * sway) * state.currentMovementSpeedMultiplier;
+            shape.translation.y += (sd.vy + perpY * sway) * state.currentMovementSpeedMultiplier;
             shape.rotation += sd.rotationSpeed * state.currentRotationSpeedMultiplier;
 
             const halfW = sd.approxWidth / 2, halfH = sd.approxHeight / 2;
@@ -1138,7 +1152,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update Raining Cakes
         if (state.isBirthdayModeActive && rainingCakesContainer && (now - state.lastRainCakeSpawnTime > RAIN_CAKE_SPAWN_INTERVAL)) {
-            spawnSmallCake(); // Uses clamped colors
+            spawnSmallCake();
             state.lastRainCakeSpawnTime = now;
         }
         for (let i = state.activeRainingCakes.length - 1; i >= 0; i--) {
@@ -1167,8 +1181,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (progress >= 1) sd.isFadingIn = false;
             }
 
-            shape.translation.x += sd.vx * state.currentMovementSpeedMultiplier;
-            shape.translation.y += sd.vy * state.currentMovementSpeedMultiplier;
+            // --- TRANSITION SHAPE MOVEMENT & CURVING ---
+            const perpX = -sd.vy;
+            const perpY = sd.vx;
+            const sway = Math.sin(now * sd.curveFreq + sd.curveOffset) * sd.curveAmp;
+
+            shape.translation.x += (sd.vx + perpX * sway) * state.currentMovementSpeedMultiplier;
+            shape.translation.y += (sd.vy + perpY * sway) * state.currentMovementSpeedMultiplier;
             shape.rotation += sd.rotationSpeed * state.currentRotationSpeedMultiplier;
 
             const buffer = Math.max(sd.approxWidth, sd.approxHeight) * 0.7;
