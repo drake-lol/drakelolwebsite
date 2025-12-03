@@ -1159,27 +1159,52 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // 5. Old Color Cleanup
-        if (!state.cleanupTriggeredForCurrentPaletteChange && state.previousColorPaletteForCleanup.length > 0 && (now - state.paletteChangeTimestampForCleanup > CLEANUP_START_DELAY)) {
+        // 5. Old Color Cleanup (Optimized for Performance)
+        // Checks if old colors exist and throttles their removal to prevent lag spikes.
+        if (state.previousColorPaletteForCleanup.length > 0 && (now - state.paletteChangeTimestampForCleanup > CLEANUP_START_DELAY)) {
             const currentPaletteSet = new Set(state.colorPalette.map(item => item.color.toUpperCase()));
+            
+            // LIMIT: Only swap this many shapes per frame. 
+            // 2 shapes/frame @ 60fps = 120 shapes swapped per second.
+            // This is visually fast but computationally cheap.
+            const MAX_SWAPS_PER_FRAME = 2; 
+            
             let shapesMoved = 0;
+            let foundOldColor = false;
+
             for (let i = state.shapesData.length - 1; i >= 0; i--) {
                 const sd = state.shapesData[i];
                 if (sd.twoShape?.fill) {
                     const shapeColor = sd.twoShape.fill.toUpperCase();
+                    
+                    // Check if this shape has an old color not in the new palette
                     if (state.previousColorPaletteForCleanup.includes(shapeColor) && !currentPaletteSet.has(shapeColor)) {
-                        sd.isMarkedForCleanupScaling = true;
-                        sd.cleanupScaleStartTime = now;
-                        sd.cleanupScaleDuration = rand(5000, 10000);
-                        state.fadingOutShapesData.push(sd);
-                        state.shapesData.splice(i, 1);
-                        shapesMoved++;
+                        foundOldColor = true;
+
+                        // Only proceed if we haven't hit our CPU budget for this frame
+                        if (shapesMoved < MAX_SWAPS_PER_FRAME) {
+                            sd.isMarkedForCleanupScaling = true;
+                            sd.cleanupScaleStartTime = now;
+                            
+                            // Fast fade duration (0.8s - 1.5s)
+                            sd.cleanupScaleDuration = rand(5000, 10000); 
+                            
+                            state.fadingOutShapesData.push(sd);
+                            state.shapesData.splice(i, 1);
+                            shapesMoved++;
+                        }
                     }
                 }
             }
+
+            // Instantly spawn replacements for the few we just removed
             if (shapesMoved > 0) adjustShapesArray();
-            state.cleanupTriggeredForCurrentPaletteChange = true;
-            state.previousColorPaletteForCleanup = [];
+
+            // Only stop checking when we can't find ANY old colors left in the scene
+            if (!foundOldColor) {
+                state.previousColorPaletteForCleanup = [];
+                state.cleanupTriggeredForCurrentPaletteChange = true;
+            }
         }
 
         // 6. Update Fading Shapes
