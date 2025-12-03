@@ -574,21 +574,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const resolutionSpeedFactor = (RESOLUTIONS[state.currentResolutionIndex].width / BASE_RESOLUTION_WIDTH);
         const speed = baseSpeedValue * resolutionSpeedFactor * state.currentMovementSpeedMultiplier * speedFactor;
 
-        if (state.isInitialShapeSpawn && !isTransition && Math.random() < 0.5) {
-            const center = { x: two.width / 2, y: two.height / 2 };
-            const spawnRadius = Math.min(two.width, two.height) * 0.2;
-            const angle = Math.random() * Math.PI * 2, dist = Math.random() * spawnRadius;
-            newTwoShape.translation.set(center.x + Math.cos(angle) * dist, center.y + Math.sin(angle) * dist);
+        // --- UPDATED PLACEMENT LOGIC START ---
+        if (state.isInitialShapeSpawn && !isTransition) {
+            // Pick a random spot anywhere on the canvas
+            // We use a small margin so they don't spawn half-clipped off the screen initially
+            const margin = Math.min(approxWidth, approxHeight); 
+            const x = rand(0, two.width);
+            const y = rand(0, two.height);
+            
+            newTwoShape.translation.set(x, y);
+
+            // Give it a random velocity direction (0 to 360 degrees)
             const vAngle = Math.random() * Math.PI * 2;
             shapeData.vx = Math.cos(vAngle) * speed;
             shapeData.vy = Math.sin(vAngle) * speed;
         } else {
+            // Keep the original "spawn from edges" logic for new shapes
+            // that appear after the initial load.
             const offset = Math.max(approxWidth, approxHeight) * 0.7;
             const spawnConfig = SPAWN_CONFIGS[randInt(0, SPAWN_CONFIGS.length - 1)];
             newTwoShape.translation.set(spawnConfig.getX(two.width, two.height, offset), spawnConfig.getY(two.width, two.height, offset));
             shapeData.vx = spawnConfig.getVX(speed);
             shapeData.vy = spawnConfig.getVY(speed);
         }
+        // --- UPDATED PLACEMENT LOGIC END ---
 
         if (isTransition) {
             shapeData.spawnTime = performance.now();
