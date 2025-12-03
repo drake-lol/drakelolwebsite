@@ -3,6 +3,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = $('scene-container');
     if (!container) return console.error("Scene container not found!");
 
+    // --- NEW: DISABLE DARK READER ---
+    // This injects a meta tag that tells Dark Reader: "Do not invert this page."
+    const metaLock = document.createElement('meta');
+    metaLock.name = "darkreader-lock";
+    document.head.appendChild(metaLock);
+
+    // Also tell the browser this is natively a dark theme
+    document.documentElement.style.colorScheme = 'dark';
+    // --------------------------------
+
     // --- State ---
     const state = {
         isPaused: false, pausedByVisibility: false,
@@ -13,6 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
         rawUnbalancedPalette: [], currentDominanceCap: 60,
         currentAccentBoost: 0.5, currentMinThreshold: 1, colorPalette: [], defaultColorPalette: [],
         targetBackgroundColor: '#181818', previousBackgroundColorForTransition: '#181818',
+        currentTextColor: '#FFFFFF', targetTextColor: '#FFFFFF', previousTextColorForTransition: '#FFFFFF',
+        textColorTransitionStartTime: 0, isTextColorTransitioning: false, isFirstTextUpdate: true,
         currentAnimatedBackgroundColor: '#181818', backgroundColorTransitionStartTime: 0, isBackgroundTransitioning: false,
         prevAnimatedBgColorForBlur: '#181818', prevBlurToggleState: true, prevBlurIntensityForBlur: 300, // Blur is on by default
         lastfmPollIntervalId: null, currentAlbumArtUrl: '', initialSceneSetupPerformed: false,
@@ -62,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const BASE_RESOLUTION_WIDTH = 16;
     const FADE_DURATION = 500;
     const MAX_LIGHTNESS = 0.75;
+    const TEXT_COLOR_TRANSITION_DURATION = 5000;
     const SPAWN_CONFIGS = [
         { getX: (w, h, o) => -o, getY: (w, h, o) => rand(0, h), getVX: (s) => s, getVY: (s) => rand(-s * 0.3, s * 0.3)},
         { getX: (w, h, o) => rand(0, w), getY: (w, h, o) => -o, getVX: (s) => rand(-s * 0.3, s * 0.3), getVY: (s) => s},
@@ -190,6 +203,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (d < minDistanceSq) { minDistanceSq = d; closestIndex = i; }
         }
         return closestIndex;
+    }
+
+    function applyMenuTextColorToDom(colorHex) {
+        if (!colorHex) return;
+
+        // Apply to Links
+        if (state.oldMenu.links) {
+            state.oldMenu.links.forEach(el => el.style.color = colorHex);
+        }
+
+        // Apply to SVGs (Signatures)
+        if (state.oldMenu.sigs) {
+            state.oldMenu.sigs.forEach(svg => {
+                svg.querySelectorAll('path, circle, rect, polygon, ellipse, line, .cls-1')
+                    .forEach(el => el.style.fill = colorHex);
+            });
+        }
     }
 
     function normalizeAndCapWeights(palette, cap = 50, boost = 5) {
@@ -637,23 +667,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateOldMenuElementsStyle() {
-        // Use the potentially UNCLAMPED background color as the base for text color calculation
-        const baseColorHex = state.currentAnimatedBackgroundColor || '#121212';
-        const hsl = hexToHSL(baseColorHex);
+        // 1. Find the Best Source Color
+        // Default to background
+        let sourceColorHex = state.targetBackgroundColor || '#121212';
+       
+        if (state.colorPalette && state.colorPalette.length > 0) {
+            // PRIORITY 1: Look for the specific "Accent" color flagged by our extraction logic
+            const accent = state.colorPalette.find(c => c.isAccent);
+            if (accent) {
+                sourceColorHex = accent.color;
+            } else {
+                // PRIORITY 2: Fallback to the most saturated color in the palette
+                const sorted = state.colorPalette.map(p => ({
+                    hex: p.color,
+                    hsl: hexToHSL(p.color)
+                })).sort((a, b) => b.hsl.s - a.hsl.s);
+                sourceColorHex = sorted[0].hex;
+            }
+        }
 
-        const targetLightness = 0.85; // Target 85% lightness for contrast
-        const finalSat = (hsl.s < 0.01) ? 0 : 1.0; // Keep saturation logic
+        // 2. FORCE MAXIMUM VIBRANCY
+        const hsl = hexToHSL(sourceColorHex);
+       
+        // Strict threshold: If it has even a tiny bit of color (s > 0.05), we explode it.
+        const isBasicallyGray = hsl.s < 0.05; 
+       
+        // SETTINGS FOR VIBRANCY:
+        // Saturation: 1.0 (100%) - Pure Color
+        // Lightness: 0.85 (85%) - INCREASED from 0.75 to make text brighter
+        const targetSat = isBasicallyGray ? 0 : 1.0; 
+        const targetLight = 0.85; 
 
-        // Calculate the final color WITHOUT clamping the lightness
-        const finalHex = hslToHex(hsl.h, finalSat, targetLightness);
+        const calculatedTargetHex = hslToHex(hsl.h, targetSat, targetLight);
 
-        // Apply the UNCLAMPED finalHex to the old menu elements
-        if (state.oldMenu.links) state.oldMenu.links.forEach(el => el.style.color = finalHex);
-        if (state.oldMenu.sigs) {
-            state.oldMenu.sigs.forEach(svg => {
-                svg.querySelectorAll('path, circle, rect, polygon, ellipse, line, .cls-1')
-                   .forEach(el => el.style.fill = finalHex);
-            });
+        // 3. First Load Logic / Synchronization
+        // We bypass the transition if it's the very first update OR if the scene 
+        // hasn't finished its initial setup yet (prevents fading from gray to color on load).
+        if (state.isFirstTextUpdate || !state.initialSceneSetupPerformed) {
+            state.currentTextColor = calculatedTargetHex;
+            state.targetTextColor = calculatedTargetHex;
+            state.previousTextColorForTransition = calculatedTargetHex;
+            applyMenuTextColorToDom(calculatedTargetHex);
+            
+            // Only mark the first update as "complete" if the scene is actually ready.
+            // This ensures the first REAL album art color snaps instantly.
+            if (state.initialSceneSetupPerformed) {
+                state.isFirstTextUpdate = false;
+            }
+            return; 
+        }
+
+        // 4. Transition Logic
+        if (calculatedTargetHex.toUpperCase() !== state.targetTextColor.toUpperCase()) {
+            state.previousTextColorForTransition = state.currentTextColor;
+            state.targetTextColor = calculatedTargetHex;
+            state.textColorTransitionStartTime = performance.now();
+            state.isTextColorTransitioning = true;
         }
     }
 
@@ -822,15 +891,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function applyDefaultColors() {
         scheduleOldColorCleanup();
         state.previousBackgroundColorForTransition = state.currentAnimatedBackgroundColor;
-        // Clamp the default background color before applying
         state.targetBackgroundColor = clampColorLightness(state.defaultBackgroundColor);
         state.backgroundColorTransitionStartTime = performance.now();
         state.isBackgroundTransitioning = true;
-        // Clamp the default palette colors before applying
+        
         state.colorPalette = state.defaultColorPalette.length > 0 ?
             state.defaultColorPalette.map(item => ({ ...item, color: clampColorLightness(item.color) })) :
             [];
-        updateDynamicM3ThemeColors(state.targetBackgroundColor, state.colorPalette); // Will use clamped colors
+            
+        updateDynamicM3ThemeColors(state.targetBackgroundColor, state.colorPalette);
+        
+        updateOldMenuElementsStyle(); 
     }
 
 
@@ -941,6 +1012,8 @@ document.addEventListener('DOMContentLoaded', () => {
             else state.firstLastFmColorChangeDone = true;
             state.lastFmColorsExtractedSuccessfully = true;
 
+            updateOldMenuElementsStyle();
+
         } catch (err) {
             console.error("Error in hybrid color extraction:", err);
             state.lastFmColorsExtractedSuccessfully = false;
@@ -1024,7 +1097,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const twoW = two.width, twoH = two.height;
 
-        // Background Color Transition
+        // 1. Background Color Transition
         if (state.isBackgroundTransitioning) {
             const progress = Math.min((now - state.backgroundColorTransitionStartTime) / BACKGROUND_COLOR_TRANSITION_DURATION, 1);
             const prevRgb = hexToRgb(state.previousBackgroundColorForTransition);
@@ -1042,24 +1115,51 @@ document.addEventListener('DOMContentLoaded', () => {
             state.currentAnimatedBackgroundColor = state.targetBackgroundColor;
         }
 
-        // Update Old Menu Theme
+        // 2. Text Color Transition (NEW)
+        if (state.isTextColorTransitioning) {
+            const progress = Math.min((now - state.textColorTransitionStartTime) / TEXT_COLOR_TRANSITION_DURATION, 1);
+            
+            const prevRgb = hexToRgb(state.previousTextColorForTransition);
+            const targetRgb = hexToRgb(state.targetTextColor);
+
+            // Interpolate RGB
+            state.currentTextColor = rgbToHex(
+                prevRgb.r + (targetRgb.r - prevRgb.r) * progress,
+                prevRgb.g + (targetRgb.g - prevRgb.g) * progress,
+                prevRgb.b + (targetRgb.b - prevRgb.b) * progress
+            );
+
+            applyMenuTextColorToDom(state.currentTextColor);
+
+            if (progress >= 1) {
+                state.isTextColorTransitioning = false;
+                state.currentTextColor = state.targetTextColor;
+            }
+        } 
+        // Fallback: If not transitioning, ensure we are at the target color (handles initial load)
+        else if (state.currentTextColor !== state.targetTextColor) {
+            state.currentTextColor = state.targetTextColor;
+            applyMenuTextColorToDom(state.currentTextColor);
+        }
+
+        // 3. Trigger Updates if Background Changed
+        // This ensures we recalculate the *Target* text color if the background target changes
         if (state.currentAnimatedBackgroundColor !== state.previousFrameAnimatedBgColor) {
-            updateOldMenuElementsStyle();
             updateOldMenuThemeMetaTag();
             state.previousFrameAnimatedBgColor = state.currentAnimatedBackgroundColor;
         }
 
-        // Update Blur
+        // 4. Update Blur
         if (state.twoJsCanvas) {
-             const bgColorForBlur = clampColorLightness(state.currentAnimatedBackgroundColor);
+            const bgColorForBlur = clampColorLightness(state.currentAnimatedBackgroundColor);
             const blurStateChanged = bgColorForBlur !== state.prevAnimatedBgColorForBlur;
             if (blurStateChanged) {
-                 applyBlurEffect(bgColorForBlur);
-                 state.prevAnimatedBgColorForBlur = bgColorForBlur;
+                applyBlurEffect(bgColorForBlur);
+                state.prevAnimatedBgColorForBlur = bgColorForBlur;
             }
         }
 
-        // Old Color Cleanup
+        // 5. Old Color Cleanup
         if (!state.cleanupTriggeredForCurrentPaletteChange && state.previousColorPaletteForCleanup.length > 0 && (now - state.paletteChangeTimestampForCleanup > CLEANUP_START_DELAY)) {
             const currentPaletteSet = new Set(state.colorPalette.map(item => item.color.toUpperCase()));
             let shapesMoved = 0;
@@ -1082,14 +1182,13 @@ document.addEventListener('DOMContentLoaded', () => {
             state.previousColorPaletteForCleanup = [];
         }
 
-        // Update Fading Shapes
+        // 6. Update Fading Shapes
         for (let i = state.fadingOutShapesData.length - 1; i >= 0; i--) {
             const sd = state.fadingOutShapesData[i];
             if (sd.twoShape) {
                 const progress = Math.min((now - sd.cleanupScaleStartTime) / sd.cleanupScaleDuration, 1);
                 sd.twoShape.opacity = 1 - easeInOutQuad(progress);
                 
-                // Also apply curves to fading shapes for consistency
                 const perpX = -sd.vy;
                 const perpY = sd.vx;
                 const sway = Math.sin(now * sd.curveFreq + sd.curveOffset) * sd.curveAmp;
@@ -1107,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Update Main Shapes (Combined Loop)
+        // 7. Update Main Shapes
         let reinitCount = 0;
         const maxReinit = Math.max(1, ~~(state.currentNumShapes / REINIT_BATCH_DIVISOR));
         for (let i = state.shapesData.length - 1; i >= 0; i--) {
@@ -1125,15 +1224,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const shape = sd.twoShape;
-
-            // --- MAIN SHAPE MOVEMENT & CURVING ---
-            // Calculate perpendicular vector (-vy, vx)
             const perpX = -sd.vy;
             const perpY = sd.vx;
-            // Calculate sine wave sway
             const sway = Math.sin(now * sd.curveFreq + sd.curveOffset) * sd.curveAmp;
 
-            // Apply Velocity + Sway
             shape.translation.x += (sd.vx + perpX * sway) * state.currentMovementSpeedMultiplier;
             shape.translation.y += (sd.vy + perpY * sway) * state.currentMovementSpeedMultiplier;
             shape.rotation += sd.rotationSpeed * state.currentRotationSpeedMultiplier;
@@ -1150,7 +1244,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Update Raining Cakes
+        // 8. Update Raining Cakes
         if (state.isBirthdayModeActive && rainingCakesContainer && (now - state.lastRainCakeSpawnTime > RAIN_CAKE_SPAWN_INTERVAL)) {
             spawnSmallCake();
             state.lastRainCakeSpawnTime = now;
@@ -1169,7 +1263,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Update Transition Shapes
+        // 9. Update Transition Shapes
         for (let i = state.transitionShapesData.length - 1; i >= 0; i--) {
             const sd = state.transitionShapesData[i];
             const shape = sd.twoShape;
@@ -1181,7 +1275,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (progress >= 1) sd.isFadingIn = false;
             }
 
-            // --- TRANSITION SHAPE MOVEMENT & CURVING ---
             const perpX = -sd.vy;
             const perpY = sd.vx;
             const sway = Math.sin(now * sd.curveFreq + sd.curveOffset) * sd.curveAmp;
