@@ -1318,85 +1318,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- JIGGLY BUTTON LOGIC (UPDATED) ---
     function setupJigglyButtonEffects() {
-        // Use the specific selector for menu links
-        const buttons = document.querySelectorAll('.b-c .b');
-        const scrollContainer = document.querySelector('.b-c'); // Get the scrollable container
-        if (buttons.length === 0 || !scrollContainer) return;
+    const buttons = document.querySelectorAll('.b-c .b');
+    const scrollContainer = document.querySelector('.b-c');
+    if (buttons.length === 0 || !scrollContainer) return;
 
-        const buttonArray = Array.from(buttons);
-        
-        // Function to get the current --s variable value as a number
-        const getSUnit = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 75;
+    const buttonArray = Array.from(buttons);
+    const getSUnit = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 75;
 
-        buttons.forEach((button, index) => {
+    const applyJiggle = (hoveredIndex) => {
+        const basePush = getSUnit() * 0.4;
+        const falloffBase = 0.5;
+
+        buttonArray.forEach((btn, i) => {
+            if (i === hoveredIndex) {
+                btn.style.setProperty('--jiggle-offset', '0px');
+                return;
+            }
+
+            const distance = Math.abs(i - hoveredIndex);
+            // Geometric series sum formula to prevent "creeping" offsets
+            const displacement = basePush * ((1 - Math.pow(falloffBase, distance)) / (1 - falloffBase));
+            const direction = i > hoveredIndex ? 1 : -1;
             
-            button.addEventListener('mouseenter', () => {
-                const targetIndex = index;
-                
-                // --- KEY CHANGES HERE ---
-                const basePush = getSUnit() * 0.4; // Base push for the nearest neighbor
-                const falloffBase = 0.5; // Falloff ratio. 0.5 = 50% falloff per button
-                // --- END KEY CHANGES ---
-
-                // --- 1. SCROLL INTO VIEW ---
-                const containerRect = scrollContainer.getBoundingClientRect();
-                const buttonRect = button.getBoundingClientRect();
-                
-                // Check if button is fully visible within the container
-                // Adding a 1px buffer for safety
-                const isTopVisible = buttonRect.top >= containerRect.top - 1;
-                const isBottomVisible = buttonRect.bottom <= containerRect.bottom + 1;
-
-                if (!isTopVisible || !isBottomVisible) {
-                    // This will scroll the parent container (.b-c)
-                    // to make the button visible.
-                    button.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-
-                // --- 2. APPLY CUMULATIVE PUSH ---
-                let cumulativePushDown = 0;
-                let cumulativePushUp = 0;
-
-                // Iterate downwards from the hovered button
-                for (let i = targetIndex + 1; i < buttonArray.length; i++) {
-                    const distance = i - targetIndex; // 1, 2, 3...
-                    const falloff = Math.pow(falloffBase, distance - 1); // 1, 0.5, 0.25...
-                    const push = basePush * falloff;
-                    cumulativePushDown += push;
-                    buttonArray[i].style.transform = `translateY(${cumulativePushDown}px)`;
-                }
-
-                // Iterate upwards from the hovered button
-                for (let i = targetIndex - 1; i >= 0; i--) {
-                    const distance = targetIndex - i; // 1, 2, 3...
-                    const falloff = Math.pow(falloffBase, distance - 1); // 1, 0.5, 0.25...
-                    const push = basePush * falloff;
-                    cumulativePushUp -= push; // Negative to push up
-                    buttonArray[i].style.transform = `translateY(${cumulativePushUp}px)`;
-                }
-
-                // Ensure the hovered button itself is not translated
-                if (button.style.transform) {
-                     button.style.transform = '';
-                }
-            });
-            
-            button.addEventListener('mouseleave', () => {
-                // When the mouse leaves, reset all buttons
-                buttons.forEach(btn => {
-                    btn.style.transform = ''; // Reset to CSS default (lets :hover scale work)
-                });
-            });
+            btn.style.setProperty('--jiggle-offset', `${direction * displacement}px`);
         });
+    };
 
-        // Add a mouseleave listener to the *container* as a fallback
-        // to reset all buttons if the mouse leaves the whole area.
-        scrollContainer.addEventListener('mouseleave', () => {
-             buttons.forEach(btn => {
-                btn.style.transform = '';
-            });
+    const clearJiggle = () => {
+        buttonArray.forEach(btn => btn.style.setProperty('--jiggle-offset', '0px'));
+    };
+
+    buttonArray.forEach((button, index) => {
+        button.addEventListener('mouseenter', () => applyJiggle(index));
+        button.addEventListener('mouseleave', (e) => {
+            // Only clear if moving to something that isn't another button
+            if (!e.relatedTarget || !e.relatedTarget.classList.contains('b')) {
+                clearJiggle();
+            }
         });
-    }
+    });
+
+    scrollContainer.addEventListener('mouseleave', clearJiggle);
+}
 
     // --- Event Listeners Setup ---
     function setupEventListeners() {

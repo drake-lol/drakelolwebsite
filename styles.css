@@ -79,7 +79,7 @@ canvas,
   position: fixed;
   bottom: 0;
   left: 0;
-  width: 100%; /* Forces container to span full width */
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -104,11 +104,19 @@ canvas,
 /* --- BUTTONS --- */
 .b {
   opacity: 0.8;
-  --jello-bezier: cubic-bezier(0.68, -0.55, 0.27, 1.55);
-  --jello-duration: 0.4s;
-  transition: opacity var(--jello-duration) var(--jello-bezier),
+  --jiggle-offset: 0px; 
+  
+  /* UPDATED: "Elastic" overshoot bezier curve */
+  --jello-bezier: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --jello-duration: 0.5s; /* Slightly longer duration to enjoy the bounce */
+  
+  transition: opacity 0.3s ease,
               transform var(--jello-duration) var(--jello-bezier),
-              font-weight var(--jello-duration) var(--jello-bezier);
+              font-weight 0.3s ease;
+              
+  /* UPDATED: Performance hint for the browser */
+  will-change: transform, opacity;
+
   margin: 0;
   font-size: var(--s);
   cursor: pointer;
@@ -117,10 +125,8 @@ canvas,
   text-decoration: none;
   color: inherit;
   
-  /* --- CHANGED: Was 80vw, now 100% to fill the container --- */
   max-width: 100%; 
-  padding-right: 20px; /* Added extra padding to account for the scale(1.1) growth on hover */
-  
+  padding-right: 20px;
   box-sizing: border-box;
   padding-left: 10px;
   text-transform: lowercase;
@@ -130,20 +136,15 @@ canvas,
   font-weight: 300;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   position: relative;
-}
 
-.b:not(#lastfm-button) {
-  line-height: 1.5;
-}
-
-a.b[href*="roblox.com"] {
-  line-height: 2;
+  transform: translateY(var(--jiggle-offset)) scale(1);
 }
 
 .b:hover {
   opacity: 1;
-  transform: scale(1.1);
   font-weight: 700;
+  /* Scale also benefits from the elastic bezier now */
+  transform: translateY(var(--jiggle-offset)) scale(1.1);
 }
 
 #lastfm-button {
@@ -175,18 +176,6 @@ a.b[href*="roblox.com"] {
   left: 0;
   width: 100%;
   height: 100%;
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-mode: alpha;
-  mask-mode: alpha;
-  background-blend-mode: multiply;
 }
 
 .small-cake-base {
@@ -217,39 +206,24 @@ a.b[href*="roblox.com"] {
     left: 50%;
     transform: translateX(-50%);
     padding: var(--s);
-    /* Ensure signature stays on top visually */
     pointer-events: none; 
   }
 
   .b-c {
-    /* RESET DESKTOP POSITIONING */
     position: fixed;
     top: 0; 
     bottom: 0;
     left: 0;
-    transform: none; /* Remove the translateX since we are using width 100% */
-    
-    /* LAYOUT & SIZING */
     width: 100%;
-    height: 100vh; /* Take up full screen */
-    max-height: none; /* Remove desktop height limit */
-    
-    /* CENTERING */
+    height: 100vh; 
+    max-height: none; 
     display: flex;
     flex-direction: column;
     align-items: center; 
-    justify-content: center; /* Vertically centers the items */
-    
-    /* OFFSETS */
+    justify-content: center; 
     padding: var(--s);
-    /* Calculate space for signature: 
-       Signature has 1 unit padding top + 1 unit height + 1 unit padding bottom 
-       = approx 3 * var(--s) to clear it completely. */
     padding-top: calc(var(--s) * 3); 
-    
     box-sizing: border-box;
-    
-    /* Adjust mask to fade slightly at top (under signature) and bottom */
     -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s), black 90%, transparent 100%);
     mask-image: linear-gradient(to bottom, transparent 0px, black var(--s), black 90%, transparent 100%);
   }
@@ -260,7 +234,13 @@ a.b[href*="roblox.com"] {
     flex-shrink: 0;
     width: auto;
     max-width: 90%;
-    padding: 5px; /* Added slight vertical padding for touch targets */
+    padding: 5px;
+    /* Maintain jiggle on mobile */
+    transform: translateY(var(--jiggle-offset)) scale(1);
+  }
+  
+  .b:hover {
+    transform: translateY(var(--jiggle-offset)) scale(1.1);
   }
 }
 
@@ -268,13 +248,6 @@ a.b[href*="roblox.com"] {
   :root {
     --s: 37.5px;
   }
-
-  .b-c {
-    gap: 0;
-  }
-
-  .b {
-    max-width: 95%;
-    padding: 0 2px;
-  }
+  .b-c { gap: 0; }
+  .b { max-width: 95%; padding: 0 2px; }
 }
