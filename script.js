@@ -222,6 +222,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+ * Forcefully resets all buttons to their default state:
+ * - Removes the "tap-active" class (resets font-weight to 300)
+ * - Sets jiggle-offset to 0 (resets spacing)
+ */
+const resetAllButtons = () => {
+    const buttons = document.querySelectorAll('.b-c .b');
+    buttons.forEach(btn => {
+        btn.classList.remove('tap-active');
+        btn.style.setProperty('--jiggle-offset', '0px');
+    });
+};
+
     function normalizeAndCapWeights(palette, cap = 50, boost = 5) {
         let p = JSON.parse(JSON.stringify(palette));
         const accent = p.find(c => c.isAccent);
@@ -1317,7 +1330,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- JIGGLY BUTTON LOGIC (UPDATED) ---
-    function setupJigglyButtonEffects() {
+    /**
+ * Handles the physics-like spacing (jiggle) and touch-screen feedback.
+ */
+function setupJigglyButtonEffects() {
     const buttons = document.querySelectorAll('.b-c .b');
     const scrollContainer = document.querySelector('.b-c');
     if (buttons.length === 0 || !scrollContainer) return;
@@ -1334,50 +1350,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.style.setProperty('--jiggle-offset', '0px');
                 return;
             }
-
             const distance = Math.abs(i - hoveredIndex);
-            // Geometric series sum formula to prevent "creeping" offsets
+            // Geometric series for smooth, diminishing displacement
             const displacement = basePush * ((1 - Math.pow(falloffBase, distance)) / (1 - falloffBase));
             const direction = i > hoveredIndex ? 1 : -1;
-            
             btn.style.setProperty('--jiggle-offset', `${direction * displacement}px`);
         });
     };
 
-    const clearJiggle = () => {
-        buttonArray.forEach(btn => btn.style.setProperty('--jiggle-offset', '0px'));
-    };
-
     buttonArray.forEach((button, index) => {
+        // --- Desktop Support ---
         button.addEventListener('mouseenter', () => applyJiggle(index));
+        
         button.addEventListener('mouseleave', (e) => {
-            // Only clear if moving to something that isn't another button
+            // Only clear if the mouse isn't moving directly to another button
             if (!e.relatedTarget || !e.relatedTarget.classList.contains('b')) {
-                clearJiggle();
+                resetAllButtons();
             }
         });
+
+        // --- Touch Support ---
+        button.addEventListener('touchstart', () => {
+            // Clear others first to ensure only one is expanded
+            resetAllButtons(); 
+            applyJiggle(index);
+            button.classList.add('tap-active');
+        }, { passive: true });
     });
 
-    scrollContainer.addEventListener('mouseleave', clearJiggle);
+    // Reset when the mouse leaves the entire menu container
+    scrollContainer.addEventListener('mouseleave', resetAllButtons);
 }
 
-    // --- Event Listeners Setup ---
-    function setupEventListeners() {
-        // Window Resize
-        window.addEventListener('resize', debounce(() => {
-            if (state.twoJsCanvas) {
-                applyBlurEffect(clampColorLightness(state.currentAnimatedBackgroundColor)); // Clamp on resize too
-                state.twoJsCanvas.style.width = '100%';
-                state.twoJsCanvas.style.height = '100%';
-            }
-        }, 250));
+    /**
+ * Attaches global window/document listeners for state management.
+ */
+function setupEventListeners() {
+    // Window Resize Debounce
+    window.addEventListener('resize', debounce(() => {
+        if (state.twoJsCanvas) {
+            applyBlurEffect(clampColorLightness(state.currentAnimatedBackgroundColor));
+            state.twoJsCanvas.style.width = '100%';
+            state.twoJsCanvas.style.height = '100%';
+        }
+    }, 250));
 
-        // Page Visibility
-        document.addEventListener('visibilitychange', handleVisibilityChange, false);
-        
-        // Setup the button hover logic
-        setupJigglyButtonEffects();
-    }
+    // Page Visibility & Focus Logic (The Fix)
+    // Resets bold/spacing if the user switches tabs or minimizes browser
+    window.addEventListener('blur', resetAllButtons);
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            resetAllButtons();
+            handleVisibilityChange(); // Existing visibility pause logic
+        } else {
+            handleVisibilityChange(); // Existing visibility resume logic
+        }
+    }, false);
+    
+    // Initialize the button hover/tap logic
+    setupJigglyButtonEffects();
+}
 
     // --- Initial Calls ---
     if (state.twoJsCanvas) applyBlurEffect(state.currentAnimatedBackgroundColor); // Initial bg might not be clamped yet, okay for first draw

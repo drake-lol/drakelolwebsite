@@ -105,16 +105,13 @@ canvas,
 .b {
   opacity: 0.8;
   --jiggle-offset: 0px; 
-  
-  /* UPDATED: "Elastic" overshoot bezier curve */
   --jello-bezier: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --jello-duration: 0.5s; /* Slightly longer duration to enjoy the bounce */
+  --jello-duration: 0.5s; 
   
   transition: opacity 0.3s ease,
               transform var(--jello-duration) var(--jello-bezier),
               font-weight 0.3s ease;
               
-  /* UPDATED: Performance hint for the browser */
   will-change: transform, opacity;
 
   margin: 0;
@@ -133,18 +130,30 @@ canvas,
   user-select: none;
   -webkit-user-drag: none;
   pointer-events: auto;
-  font-weight: 300;
+
+  /* FIX: Explicitly force weight to 300 to override mobile sticky-hover */
+  font-weight: 300 !important;
+  
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   position: relative;
-
   transform: translateY(var(--jiggle-offset)) scale(1);
 }
 
-.b:hover {
-  opacity: 1;
-  font-weight: 700;
-  /* Scale also benefits from the elastic bezier now */
-  transform: translateY(var(--jiggle-offset)) scale(1.1);
+/* DESKTOP HOVER: Only applied if a mouse is used */
+@media (hover: hover) {
+  .b:hover {
+    opacity: 1;
+    font-weight: 700 !important;
+    transform: translateY(var(--jiggle-offset)) scale(1.1);
+  }
+}
+
+/* TOUCH FEEDBACK: Only active while finger is on the screen (via JS) */
+.b.tap-active {
+  opacity: 1 !important;
+  font-weight: 700 !important;
+  transform: translateY(var(--jiggle-offset)) scale(1.1) !important;
+  transition: transform 0.1s var(--jello-bezier), font-weight 0.1s ease;
 }
 
 #lastfm-button {
@@ -235,12 +244,7 @@ canvas,
     width: auto;
     max-width: 90%;
     padding: 5px;
-    /* Maintain jiggle on mobile */
     transform: translateY(var(--jiggle-offset)) scale(1);
-  }
-  
-  .b:hover {
-    transform: translateY(var(--jiggle-offset)) scale(1.1);
   }
 }
 
