@@ -43,7 +43,7 @@ body {
     width: 100px;
     height: 100px;
     object-fit: cover;
-    /* --- DISABLING INTERACTION --- */
+    /* Disable right-click options/interaction */
     pointer-events: none; 
     user-select: none;
     -webkit-user-drag: none;
@@ -256,21 +256,22 @@ canvas,
 
   .b-c {
     position: fixed;
-    top: 0; 
+    /* Balanced middle-ground height */
+    top: calc(var(--s) * 2.1); 
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 100vh; 
-    max-height: none; 
+    height: auto; 
     display: flex;
     flex-direction: column;
     align-items: center; 
     justify-content: center; 
-    padding: var(--s);
-    padding-top: calc(var(--s) * 3); 
+    padding: 0;
     box-sizing: border-box;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--s), black 90%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0px, black var(--s), black 90%, transparent 100%);
+    
+    /* Top fade only, staying solid to the bottom edge */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 100%);
   }
 
   .b {
@@ -279,8 +280,10 @@ canvas,
     flex-shrink: 0;
     width: auto;
     max-width: 90%;
-    padding: 5px;
-    transform: translateY(var(--jiggle-offset)) scale(1);
+    padding: 5px 0; 
+    padding-left: 0 !important; 
+    padding-right: 0 !important;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -289,5 +292,5 @@ canvas,
     --s: 37.5px;
   }
   .b-c { gap: 0; }
-  .b { max-width: 95%; padding: 0 2px; }
+  .b { max-width: 95%; padding: 2px 0; }
 }
