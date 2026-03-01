@@ -932,30 +932,39 @@ const resetAllButtons = () => {
     function performInitialSceneSetupIfNeeded() {
         if (state.initialSceneSetupPerformed) return;
         let ready = false, setupType = "";
+        
         if (state.lastFmColorsExtractedSuccessfully) {
-            ready = true; setupType = "lastfm";
-            // Ensure Last.fm colors are clamped if they haven't been already
+            ready = true; 
+            setupType = "lastfm";
             state.targetBackgroundColor = clampColorLightness(state.targetBackgroundColor);
             state.colorPalette = state.colorPalette.map(item => ({...item, color: clampColorLightness(item.color)}));
-
         } else if (state.firstLastFmFetchAttempted) {
-            if (state.lastFmArtProcessing) return; // Wait
+            if (state.lastFmArtProcessing) return; // Still processing art, keep waiting
             if (state.defaultColorsLoaded) {
-                ready = true; setupType = "default";
-                 // Ensure default colors are used (and clamped by applyDefaultColors)
+                ready = true; 
+                setupType = "default";
                 if (state.targetBackgroundColor !== clampColorLightness(state.defaultBackgroundColor) || !arePalettesRoughlyEqual(state.colorPalette, state.defaultColorPalette.map(item => ({...item, color: clampColorLightness(item.color)})))) {
-                    applyDefaultColors(); // This already clamps
+                    applyDefaultColors(); 
                 }
             }
         }
 
         if (ready) {
             console.log(`Performing initial scene setup with ${setupType} colors.`);
-            // updateBackgroundOverlayState(state.targetBackgroundColor); // Removed
-            updateDynamicM3ThemeColors(state.targetBackgroundColor, state.colorPalette); // Uses clamped colors
+            updateDynamicM3ThemeColors(state.targetBackgroundColor, state.colorPalette);
             adjustShapesArray();
             state.initialSceneSetupPerformed = true;
             state.isInitialShapeSpawn = false;
+
+            // --- HIDE LOADER ---
+            // This triggers only once the colors are selected and applied to the scene
+            const loader = document.getElementById('site-loader');
+            if (loader) {
+                // We add a tiny delay so the transition to the new colors is smooth
+                setTimeout(() => {
+                    loader.classList.add('loader-finished');
+                }, 500);
+            }
         }
     }
 
