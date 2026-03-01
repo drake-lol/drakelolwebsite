@@ -792,8 +792,9 @@ const resetAllButtons = () => {
             const track = data.recenttracks.track[0];
             const trackName = track.name?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Track';
             const artistName = track.artist?.["#text"]?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Artist';
+            
+            // This is the direct Last.fm URL
             const lastFmTrackUrl = track.url || (user ? `https://www.last.fm/user/${user}` : "#");
-            let finalTrackUrl = lastFmTrackUrl; // Default to Last.fm
 
             const imgInfo = track.image?.find(img => img.size === 'extralarge' || img.size === 'large');
             if (imgInfo?.["#text"] && !imgInfo["#text"].includes("2a96cbd8b46e442fc41c2b86b821562f")) {
@@ -802,36 +803,8 @@ const resetAllButtons = () => {
 
             if (state.oldMenu.btn) {
                 state.oldMenu.btn.textContent = `Listening to ${trackName} by ${artistName}`;
-            }
-
-            try {
-                // 1. Try to find Apple Music link
-                const searchTerm = `${trackName} ${artistName}`;
-                const appleMusicSearchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=song&limit=1&media=music`;
-                const response = await fetch(appleMusicSearchUrl);
-                
-                if (response.ok) {
-                    const appleData = await response.json();
-                    if (appleData.resultCount > 0 && appleData.results[0].trackViewUrl) {
-                        finalTrackUrl = appleData.results[0].trackViewUrl; // Found Apple Music
-                    } else {
-                        // 2. Apple Music not found, create Spotify search link
-                        const spotifySearchTerm = `${trackName} ${artistName}`;
-                        finalTrackUrl = `https://open.spotify.com/search/${encodeURIComponent(spotifySearchTerm)}`;
-                    }
-                } else {
-                    // 2. Apple Music API failed, create Spotify search link
-                    const spotifySearchTerm = `${trackName} ${artistName}`;
-                    finalTrackUrl = `https://open.spotify.com/search/${encodeURIComponent(spotifySearchTerm)}`;
-                }
-            } catch (error) {
-                // 3. Entire search failed (e.g., network error), fall back to Last.fm
-                console.warn('Music link search failed, falling back to Last.fm link:', error);
-                finalTrackUrl = lastFmTrackUrl;
-            }
-
-            if (state.oldMenu.btn) {
-                state.oldMenu.btn.href = finalTrackUrl;
+                // Set it directly to the Last.fm link
+                state.oldMenu.btn.href = lastFmTrackUrl;
             }
 
         } else {
