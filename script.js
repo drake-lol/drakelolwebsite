@@ -9,20 +9,21 @@ document.addEventListener('DOMContentLoaded', () => {
     metaLock.name = "darkreader-lock";
     document.head.appendChild(metaLock);
 
-    // Also tell the browser this is natively a dark theme
-    document.documentElement.style.colorScheme = 'dark';
+    // Let the browser handle native elements in both color schemes
+    document.documentElement.style.colorScheme = 'dark light';
     // --------------------------------
 
     // --- State ---
     const state = {
         isPaused: false, pausedByVisibility: false,
         currentNumShapes: 60, currentScaleMultiplier: 1.0, currentRotationSpeedMultiplier: 1.0,
-        currentMovementSpeedMultiplier: 1.0, currentNumTransitionShapes: 10, currentBlurIntensity: 300,
+        currentMovementSpeedMultiplier: 1.0, currentNumTransitionShapes: 10, currentBlurIntensity: 200,
         currentResolutionIndex: 2, previousResolutionIndex: 0,
         currentBrightness: 30, currentContrast: 90, currentSaturation: 350, currentHueRotate: 0,
         rawUnbalancedPalette: [], currentDominanceCap: 60,
         currentAccentBoost: 0.5, currentMinThreshold: 1, colorPalette: [], defaultColorPalette: [],
         targetBackgroundColor: '#181818', previousBackgroundColorForTransition: '#181818',
+        targetPageBackgroundColor: '#181818', currentPageBackgroundColor: '#181818', previousPageBackgroundColorForTransition: '#181818',
         currentTextColor: '#FFFFFF', targetTextColor: '#FFFFFF', previousTextColorForTransition: '#FFFFFF',
         textColorTransitionStartTime: 0, isTextColorTransitioning: false, isFirstTextUpdate: true,
         currentAnimatedBackgroundColor: '#181818', backgroundColorTransitionStartTime: 0, isBackgroundTransitioning: false,
@@ -53,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const LASTFM_POLL_INTERVAL = 15000;
     const MAX_PALETTE_COLORS_TO_REQUEST = 8;
     const COLOR_SIMILARITY_TOLERANCE = 45;
-    const BACKGROUND_COLOR_TRANSITION_DURATION = 500;
+    const BACKGROUND_COLOR_TRANSITION_DURATION = 5000;
     const REINIT_BATCH_DIVISOR = 30;
     const CLEANUP_START_DELAY = 0;
     const SLIDER_MAX_BLUR_INTENSITY = 300;
@@ -76,10 +77,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_LIGHTNESS = 0.75;
     const TEXT_COLOR_TRANSITION_DURATION = 5000;
     const SPAWN_CONFIGS = [
-        { getX: (w, h, o) => -o, getY: (w, h, o) => rand(0, h), getVX: (s) => s, getVY: (s) => rand(-s * 0.3, s * 0.3)},
-        { getX: (w, h, o) => rand(0, w), getY: (w, h, o) => -o, getVX: (s) => rand(-s * 0.3, s * 0.3), getVY: (s) => s},
-        { getX: (w, h, o) => w + o, getY: (w, h, o) => rand(0, h), getVX: (s) => -s, getVY: (s) => rand(-s * 0.3, s * 0.3)},
-        { getX: (w, h, o) => rand(0, w), getY: (w, h, o) => h + o, getVX: (s) => rand(-s * 0.3, s * 0.3), getVY: (s) => -s}
+        { getX: (w, h, o) => -o, getY: (w, h, o) => rand(0, h), getVX: (s) => s, getVY: (s) => rand(-s * 0.3, s * 0.3) },
+        { getX: (w, h, o) => rand(0, w), getY: (w, h, o) => -o, getVX: (s) => rand(-s * 0.3, s * 0.3), getVY: (s) => s },
+        { getX: (w, h, o) => w + o, getY: (w, h, o) => rand(0, h), getVX: (s) => -s, getVY: (s) => rand(-s * 0.3, s * 0.3) },
+        { getX: (w, h, o) => rand(0, w), getY: (w, h, o) => h + o, getVX: (s) => rand(-s * 0.3, s * 0.3), getVY: (s) => -s }
     ];
 
     // --- Key Elements ---
@@ -150,7 +151,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return rgbToHex(r * 255, g * 255, b * 255);
     };
-    // New helper to clamp lightness
+
+    // Helper to clamp lightness
     const clampColorLightness = (hexColor) => {
         let hsl = hexToHSL(hexColor);
         if (hsl.l >= MAX_LIGHTNESS + 0.001) { // Check if lightness is 80% or more
@@ -159,6 +161,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return hexColor; // Return original if below threshold
     };
+
+    // Helper to find a saturated color for the new page background
+    const getBestPageBackgroundColor = (dominantHex, palette) => {
+        const domHsl = hexToHSL(dominantHex);
+        if (domHsl.s >= 0.25) return dominantHex; // Dominant is saturated enough
+
+        if (palette && palette.length > 0) {
+            // Sort palette by saturation (highest first)
+            const sorted = [...palette].map(p => {
+                const hsl = hexToHSL(p.color);
+                return { hex: p.color, s: hsl.s, hsl: hsl };
+            }).sort((a, b) => b.s - a.s);
+            if (sorted[0].s >= 0.25) {
+                let chosenHsl = sorted[0].hsl;
+                chosenHsl.s *= 0.2; // Dull the fallback color so it isn't overly vibrant
+                return hslToHex(chosenHsl.h, chosenHsl.s, chosenHsl.l);
+            }
+        }
+        return dominantHex; // Fallback to dominant
+    };
+
     const getLuminance = hex => {
         const { r: r255, g: g255, b: b255 } = hexToRgb(hex);
         let r = r255 / 255, g = g255 / 255, b = b255 / 255;
@@ -220,6 +243,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     .forEach(el => el.style.fill = colorHex);
             });
         }
+
+        // Apply to Scroll Indicator
+        const scrollIndicatorSvg = document.querySelector('.scroll-indicator-svg');
+        if (scrollIndicatorSvg) {
+            scrollIndicatorSvg.style.stroke = colorHex;
+        }
+        const scrollIndicator = document.getElementById('scroll-indicator');
+        if (scrollIndicator) {
+            scrollIndicator.style.color = colorHex;
+        }
     }
 
     /**
@@ -227,13 +260,13 @@ document.addEventListener('DOMContentLoaded', () => {
  * - Removes the "tap-active" class (resets font-weight to 300)
  * - Sets jiggle-offset to 0 (resets spacing)
  */
-const resetAllButtons = () => {
-    const buttons = document.querySelectorAll('.b-c .b');
-    buttons.forEach(btn => {
-        btn.classList.remove('tap-active');
-        btn.style.setProperty('--jiggle-offset', '0px');
-    });
-};
+    const resetAllButtons = () => {
+        const buttons = document.querySelectorAll('.b-c .b');
+        buttons.forEach(btn => {
+            btn.classList.remove('tap-active');
+            btn.style.setProperty('--jiggle-offset', '0px');
+        });
+    };
 
     function normalizeAndCapWeights(palette, cap = 50, boost = 5) {
         let p = JSON.parse(JSON.stringify(palette));
@@ -308,7 +341,7 @@ const resetAllButtons = () => {
         let primaryAccent = null;
         // Use the already clamped palette for M3 calculations
         if (palette.length > 0) {
-             const potentials = palette // palette colors are already clamped
+            const potentials = palette // palette colors are already clamped
                 .map(item => ({ hex: item.color, contrast: getWCAGContrastRatio(item.color, surface), hsl: hexToHSL(item.color) }))
                 .filter(p => {
                     const ok = p.contrast >= MIN_CONTRAST && p.hsl.l >= 0.50;
@@ -325,7 +358,7 @@ const resetAllButtons = () => {
             }
         }
 
-         if (!primaryAccent) {
+        if (!primaryAccent) {
             let paHsl = hexToHSL(clampedBgColor); // Derive from clamped background
             if (isGray) paHsl.s = 0;
             else { paHsl.h = (paHsl.h + 40) % 360; paHsl.s = Math.min(1, Math.max(0.45, paHsl.s + 0.1)); }
@@ -349,19 +382,19 @@ const resetAllButtons = () => {
         let currentHsl = hexToHSL(primaryAccent);
         if (lum < MIN_LUMINANCE && currentHsl.l < MAX_LIGHTNESS) { // Only increase if below max
             if (currentHsl.l < 1.0) { // Check if not already max HSL lightness (1.0)
-                 for (let i = 0; i < 20; i++) {
+                for (let i = 0; i < 20; i++) {
                     currentHsl.l += 0.05;
                     currentHsl.l = Math.min(currentHsl.l, MAX_LIGHTNESS); // Apply clamp during increase
-                     if (currentHsl.l > 1.0) currentHsl.l = 1.0; // Ensure HSL doesn't exceed 1.0
+                    if (currentHsl.l > 1.0) currentHsl.l = 1.0; // Ensure HSL doesn't exceed 1.0
 
                     primaryAccent = hslToHex(currentHsl.h, currentHsl.s, currentHsl.l);
                     lum = getLuminance(primaryAccent);
                     // Break if target met OR clamp reached OR HSL max reached
-                     if (lum >= MIN_LUMINANCE || currentHsl.l >= MAX_LIGHTNESS || currentHsl.l >= 1.0) break;
+                    if (lum >= MIN_LUMINANCE || currentHsl.l >= MAX_LIGHTNESS || currentHsl.l >= 1.0) break;
                 }
             }
         } else if (currentHsl.l >= MAX_LIGHTNESS + 0.001) { // If it somehow still exceeds, clamp it finally
-             primaryAccent = clampColorLightness(primaryAccent);
+            primaryAccent = clampColorLightness(primaryAccent);
         }
 
         const onPrimary = getContrast(primaryAccent);
@@ -371,7 +404,7 @@ const resetAllButtons = () => {
             const p2 = palette // palette colors are already clamped
                 .filter(item => item.color.toUpperCase() !== primaryAccent.toUpperCase())
                 .map(item => ({ hex: item.color, hsl: hexToHSL(item.color) }))
-                .sort((a,b) => isGray ? 0 : b.hsl.s - a.hsl.s);
+                .sort((a, b) => isGray ? 0 : b.hsl.s - a.hsl.s);
             if (p2.length > 0) {
                 let sHsl = p2[0].hsl;
                 sHsl.s = isGray ? 0 : Math.min(sHsl.s, 0.4);
@@ -383,7 +416,7 @@ const resetAllButtons = () => {
 
         if (!secondaryContainer) {
             secondaryContainer = lightenDarkenColor(surface, getLuminance(surface) > 0.5 ? -10 : 12);
-             if (areColorsSimilar(hexToRgb(secondaryContainer), hexToRgb(primaryAccent), 25)) {
+            if (areColorsSimilar(hexToRgb(secondaryContainer), hexToRgb(primaryAccent), 25)) {
                 secondaryContainer = lightenDarkenColor(surface, 18);
             }
             // Clamp derived secondary container
@@ -403,7 +436,7 @@ const resetAllButtons = () => {
         root.setProperty('--m3-outline', outline);
     }
 
-    function getRandomColorFromPaletteWeighted(palette, fallback = {color: '#CCCCCC', weight: 1}) {
+    function getRandomColorFromPaletteWeighted(palette, fallback = { color: '#CCCCCC', weight: 1 }) {
         if (!palette || palette.length === 0) return fallback;
         const totalWeight = palette.reduce((sum, item) => sum + item.weight, 0);
         if (totalWeight === 0) return palette[randInt(0, palette.length - 1)];
@@ -537,7 +570,17 @@ const resetAllButtons = () => {
         if (state.currentContrast !== 100) filters.push(`contrast(${state.currentContrast}%)`);
         if (state.currentSaturation !== 100) filters.push(`saturate(${state.currentSaturation}%)`);
         if (state.currentHueRotate !== 0) filters.push(`hue-rotate(${state.currentHueRotate}deg)`);
-        container.style.filter = filters.length > 0 ? filters.join(' ') : 'none';
+
+        if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+            // Post processing to instantly turn the dark layout into light mode while perfectly retaining original hues
+            filters.push('invert(1)', 'hue-rotate(180deg)', 'saturate(200%)');
+        }
+
+        const filterStr = filters.length > 0 ? filters.join(' ') : 'none';
+        container.style.filter = filterStr;
+        if (rainingCakesContainer) {
+            rainingCakesContainer.style.filter = filterStr;
+        }
     }
 
     function scheduleOldColorCleanup() {
@@ -642,12 +685,12 @@ const resetAllButtons = () => {
         // --- CURVING PROPERTIES (Modified) ---
         // 50% chance to curve
         if (Math.random() < 0.5) {
-            shapeData.curveFreq = rand(0.0003, 0.001); 
-            shapeData.curveAmp = rand(0.5, 2.5) * (baseSpeedValue * 100); 
+            shapeData.curveFreq = rand(0.0003, 0.001);
+            shapeData.curveAmp = rand(0.5, 2.5) * (baseSpeedValue * 100);
         } else {
             // No curve = Amplitude 0
-            shapeData.curveFreq = 0; 
-            shapeData.curveAmp = 0; 
+            shapeData.curveFreq = 0;
+            shapeData.curveAmp = 0;
         }
         shapeData.curveOffset = rand(0, Math.PI * 2);
 
@@ -679,11 +722,11 @@ const resetAllButtons = () => {
         }
     }
 
-    function updateOldMenuElementsStyle() {
+    function updateOldMenuElementsStyle(instant = false) {
         // 1. Find the Best Source Color
         // Default to background
         let sourceColorHex = state.targetBackgroundColor || '#121212';
-       
+
         if (state.colorPalette && state.colorPalette.length > 0) {
             // PRIORITY 1: Look for the specific "Accent" color flagged by our extraction logic
             const accent = state.colorPalette.find(c => c.isAccent);
@@ -701,15 +744,16 @@ const resetAllButtons = () => {
 
         // 2. FORCE MAXIMUM VIBRANCY
         const hsl = hexToHSL(sourceColorHex);
-       
+
         // Strict threshold: If it has even a tiny bit of color (s > 0.05), we explode it.
-        const isBasicallyGray = hsl.s < 0.05; 
-       
+        const isBasicallyGray = hsl.s < 0.05;
+
         // SETTINGS FOR VIBRANCY:
         // Saturation: 1.0 (100%) - Pure Color
-        // Lightness: 0.85 (85%) - INCREASED from 0.75 to make text brighter
-        const targetSat = isBasicallyGray ? 0 : 1.0; 
-        const targetLight = 0.85; 
+        // Lightness: Adapts based on light/dark mode
+        const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches;
+        const targetSat = isBasicallyGray ? 0 : 1.0;
+        const targetLight = isLightMode ? 0.10 : 0.80;
 
         const calculatedTargetHex = hslToHex(hsl.h, targetSat, targetLight);
 
@@ -721,17 +765,23 @@ const resetAllButtons = () => {
             state.targetTextColor = calculatedTargetHex;
             state.previousTextColorForTransition = calculatedTargetHex;
             applyMenuTextColorToDom(calculatedTargetHex);
-            
+
             // Only mark the first update as "complete" if the scene is actually ready.
             // This ensures the first REAL album art color snaps instantly.
             if (state.initialSceneSetupPerformed) {
                 state.isFirstTextUpdate = false;
             }
-            return; 
+            return;
         }
 
         // 4. Transition Logic
-        if (calculatedTargetHex.toUpperCase() !== state.targetTextColor.toUpperCase()) {
+        if (instant) {
+            state.currentTextColor = calculatedTargetHex;
+            state.targetTextColor = calculatedTargetHex;
+            state.previousTextColorForTransition = calculatedTargetHex;
+            applyMenuTextColorToDom(calculatedTargetHex);
+            state.isTextColorTransitioning = false;
+        } else if (calculatedTargetHex.toUpperCase() !== state.targetTextColor.toUpperCase()) {
             state.previousTextColorForTransition = state.currentTextColor;
             state.targetTextColor = calculatedTargetHex;
             state.textColorTransitionStartTime = performance.now();
@@ -741,8 +791,49 @@ const resetAllButtons = () => {
 
     function updateOldMenuThemeMetaTag() {
         if (state.oldMenu.themeMeta) {
-            // Use the clamped background color for the theme tag
-            state.oldMenu.themeMeta.content = state.currentAnimatedBackgroundColor ? clampColorLightness(state.currentAnimatedBackgroundColor) : '#000000';
+            let color = state.currentAnimatedBackgroundColor ? clampColorLightness(state.currentAnimatedBackgroundColor) : '#000000';
+
+            const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches;
+            let hsl = hexToHSL(color);
+
+            if (isLightMode) {
+                // Emulate light mode CSS: invert(1) saturate(200%)
+                hsl.l = 1 - hsl.l;
+                hsl.s = Math.min(1, hsl.s * 2.0);
+            } else {
+                // Emulate dark mode CSS: brightness(30%) saturate(350%)
+                hsl.l = Math.max(0, hsl.l * (state.currentBrightness / 100));
+                hsl.s = Math.min(1, hsl.s * (state.currentSaturation / 100));
+            }
+
+            color = hslToHex(hsl.h, hsl.s, hsl.l);
+
+            // Dynamically blend the tab bar into the scrolling page's background color when scrolling down
+            const scrollY = window.scrollY;
+            const fadeStart = window.innerHeight * 0.05; // Start fading tab bar early
+            const fadeEnd = window.innerHeight * 0.4;    // Fully matched before half screen down
+
+            if (scrollY > fadeStart) {
+                const targetLightness = isLightMode ? 0.90 : 0.20; // Matches --page-bg-l in CSS
+                const targetS = Math.min(1, hexToHSL(state.currentAnimatedBackgroundColor).s * 2.0);
+                const targetColorHex = hslToHex(hsl.h, targetS, targetLightness);
+
+                const progress = Math.min(1, (scrollY - fadeStart) / (fadeEnd - fadeStart));
+
+                if (progress >= 1) {
+                    color = targetColorHex;
+                } else {
+                    const cRgb = hexToRgb(color);
+                    const tRgb = hexToRgb(targetColorHex);
+                    color = rgbToHex(
+                        cRgb.r + (tRgb.r - cRgb.r) * progress,
+                        cRgb.g + (tRgb.g - cRgb.g) * progress,
+                        cRgb.b + (tRgb.b - cRgb.b) * progress
+                    );
+                }
+            }
+
+            state.oldMenu.themeMeta.content = color;
         }
     }
 
@@ -792,7 +883,7 @@ const resetAllButtons = () => {
             const track = data.recenttracks.track[0];
             const trackName = track.name?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Track';
             const artistName = track.artist?.["#text"]?.replace(/\s*\(.*?\)\s*/g, ' ') || 'Unknown Artist';
-            
+
             // This is the direct Last.fm URL
             const lastFmTrackUrl = track.url || (user ? `https://www.last.fm/user/${user}` : "#");
 
@@ -814,7 +905,7 @@ const resetAllButtons = () => {
                 state.oldMenu.btn.href = user ? `https://www.last.fm/user/${user}` : "#";
             }
         }
-        
+
         // Update favicon regardless of playing state
         updateOldMenuFavicon(artUrl, isPlaying);
     }
@@ -878,16 +969,30 @@ const resetAllButtons = () => {
         scheduleOldColorCleanup();
         state.previousBackgroundColorForTransition = state.currentAnimatedBackgroundColor;
         state.targetBackgroundColor = clampColorLightness(state.defaultBackgroundColor);
-        state.backgroundColorTransitionStartTime = performance.now();
-        state.isBackgroundTransitioning = true;
-        
+
         state.colorPalette = state.defaultColorPalette.length > 0 ?
             state.defaultColorPalette.map(item => ({ ...item, color: clampColorLightness(item.color) })) :
             [];
-            
+
+        state.previousPageBackgroundColorForTransition = state.currentPageBackgroundColor;
+        state.targetPageBackgroundColor = getBestPageBackgroundColor(state.targetBackgroundColor, state.colorPalette);
+
+        if (!state.initialSceneSetupPerformed) {
+            state.currentAnimatedBackgroundColor = state.targetBackgroundColor;
+            state.currentPageBackgroundColor = state.targetPageBackgroundColor;
+            state.isBackgroundTransitioning = false;
+        } else {
+            state.backgroundColorTransitionStartTime = performance.now();
+            state.isBackgroundTransitioning = true;
+        }
+
+        state.colorPalette = state.defaultColorPalette.length > 0 ?
+            state.defaultColorPalette.map(item => ({ ...item, color: clampColorLightness(item.color) })) :
+            [];
+
         updateDynamicM3ThemeColors(state.targetBackgroundColor, state.colorPalette);
-        
-        updateOldMenuElementsStyle(); 
+
+        updateOldMenuElementsStyle();
     }
 
 
@@ -905,19 +1010,19 @@ const resetAllButtons = () => {
     function performInitialSceneSetupIfNeeded() {
         if (state.initialSceneSetupPerformed) return;
         let ready = false, setupType = "";
-        
+
         if (state.lastFmColorsExtractedSuccessfully) {
-            ready = true; 
+            ready = true;
             setupType = "lastfm";
             state.targetBackgroundColor = clampColorLightness(state.targetBackgroundColor);
-            state.colorPalette = state.colorPalette.map(item => ({...item, color: clampColorLightness(item.color)}));
+            state.colorPalette = state.colorPalette.map(item => ({ ...item, color: clampColorLightness(item.color) }));
         } else if (state.firstLastFmFetchAttempted) {
             if (state.lastFmArtProcessing) return; // Still processing art, keep waiting
             if (state.defaultColorsLoaded) {
-                ready = true; 
+                ready = true;
                 setupType = "default";
-                if (state.targetBackgroundColor !== clampColorLightness(state.defaultBackgroundColor) || !arePalettesRoughlyEqual(state.colorPalette, state.defaultColorPalette.map(item => ({...item, color: clampColorLightness(item.color)})))) {
-                    applyDefaultColors(); 
+                if (state.targetBackgroundColor !== clampColorLightness(state.defaultBackgroundColor) || !arePalettesRoughlyEqual(state.colorPalette, state.defaultColorPalette.map(item => ({ ...item, color: clampColorLightness(item.color) })))) {
+                    applyDefaultColors();
                 }
             }
         }
@@ -951,8 +1056,8 @@ const resetAllButtons = () => {
             const ctx = canvas.getContext('2d');
             const MAX_SIZE = 150;
             let w = img.width, h = img.height;
-            if (w > h) { if (w > MAX_SIZE) { h = ~~(h * (MAX_SIZE / w)); w = MAX_SIZE; }}
-            else { if (h > MAX_SIZE) { w = ~~(w * (MAX_SIZE / h)); h = MAX_SIZE; }}
+            if (w > h) { if (w > MAX_SIZE) { h = ~~(h * (MAX_SIZE / w)); w = MAX_SIZE; } }
+            else { if (h > MAX_SIZE) { w = ~~(w * (MAX_SIZE / h)); h = MAX_SIZE; } }
             canvas.width = w; canvas.height = h;
             ctx.drawImage(img, 0, 0, w, h);
 
@@ -963,7 +1068,7 @@ const resetAllButtons = () => {
             const vibrantCounts = new Map();
 
             for (let i = 0; i < pixelData.length; i += 4) {
-                const r = pixelData[i], g = pixelData[i+1], b = pixelData[i+2];
+                const r = pixelData[i], g = pixelData[i + 1], b = pixelData[i + 2];
                 const hsl = hexToHSL(rgbToHex(r, g, b));
                 if (hsl.s > 0.6 && hsl.l > 0.15 && hsl.l < 0.85) {
                     const hex = rgbToHex(r, g, b);
@@ -982,7 +1087,7 @@ const resetAllButtons = () => {
 
             const counts = new Array(paletteRgb.length).fill(0);
             for (let i = 0; i < pixelData.length; i += 4) {
-                counts[findClosestColorIndex([pixelData[i], pixelData[i+1], pixelData[i+2]], paletteRgb)]++;
+                counts[findClosestColorIndex([pixelData[i], pixelData[i + 1], pixelData[i + 2]], paletteRgb)]++;
             }
 
             // Set raw palette (still unclamped here)
@@ -998,8 +1103,18 @@ const resetAllButtons = () => {
             state.previousBackgroundColorForTransition = state.currentAnimatedBackgroundColor;
             // Clamp the dominant background color
             state.targetBackgroundColor = clampColorLightness(rgbToHex(dominantRgb[0], dominantRgb[1], dominantRgb[2]).toUpperCase());
-            state.backgroundColorTransitionStartTime = performance.now();
-            state.isBackgroundTransitioning = true;
+
+            state.previousPageBackgroundColorForTransition = state.currentPageBackgroundColor;
+            state.targetPageBackgroundColor = getBestPageBackgroundColor(state.targetBackgroundColor, state.colorPalette);
+
+            if (!state.initialSceneSetupPerformed) {
+                state.currentAnimatedBackgroundColor = state.targetBackgroundColor;
+                state.currentPageBackgroundColor = state.targetPageBackgroundColor;
+                state.isBackgroundTransitioning = false;
+            } else {
+                state.backgroundColorTransitionStartTime = performance.now();
+                state.isBackgroundTransitioning = true;
+            }
             scheduleOldColorCleanup();
 
             updateDynamicM3ThemeColors(state.targetBackgroundColor, state.colorPalette); // Uses clamped colors
@@ -1023,7 +1138,7 @@ const resetAllButtons = () => {
     async function loadDefaultColors() {
         try {
             const img = await loadImage(state.DEFAULT_IMAGE_URL);
-             // Clamp the default background color immediately
+            // Clamp the default background color immediately
             state.defaultBackgroundColor = clampColorLightness(rgbToHex(...colorThief.getColor(img)).toUpperCase());
             const paletteRgb = colorThief.getPalette(img, MAX_PALETTE_COLORS_TO_REQUEST);
             let uniqueRgbs = [];
@@ -1035,13 +1150,13 @@ const resetAllButtons = () => {
                 }
             }
             if (uniqueRgbs.length > 0) {
-                 // Clamp each default palette color
+                // Clamp each default palette color
                 state.defaultColorPalette = uniqueRgbs.map((rgb, i) => ({
                     color: clampColorLightness(rgbToHex(...rgb).toUpperCase()),
                     weight: Math.sqrt(uniqueRgbs.length - i)
                 }));
             } else {
-                 // Use the (already clamped) default background as fallback
+                // Use the (already clamped) default background as fallback
                 state.defaultColorPalette = [{ color: state.defaultBackgroundColor || '#CCCCCC', weight: 1 }];
             }
             state.defaultColorsLoaded = true;
@@ -1102,18 +1217,35 @@ const resetAllButtons = () => {
                 prevRgb.g + (targetRgb.g - prevRgb.g) * progress,
                 prevRgb.b + (targetRgb.b - prevRgb.b) * progress
             );
+
+            const prevPageRgb = hexToRgb(state.previousPageBackgroundColorForTransition);
+            const targetPageRgb = hexToRgb(state.targetPageBackgroundColor);
+            state.currentPageBackgroundColor = rgbToHex(
+                prevPageRgb.r + (targetPageRgb.r - prevPageRgb.r) * progress,
+                prevPageRgb.g + (targetPageRgb.g - prevPageRgb.g) * progress,
+                prevPageRgb.b + (targetPageRgb.b - prevPageRgb.b) * progress
+            );
+
             if (progress >= 1) {
                 state.isBackgroundTransitioning = false;
                 state.currentAnimatedBackgroundColor = state.targetBackgroundColor;
+                state.currentPageBackgroundColor = state.targetPageBackgroundColor;
             }
         } else if (state.currentAnimatedBackgroundColor !== state.targetBackgroundColor) {
             state.currentAnimatedBackgroundColor = state.targetBackgroundColor;
+        } else {
+            if (state.currentAnimatedBackgroundColor !== state.targetBackgroundColor) {
+                state.currentAnimatedBackgroundColor = state.targetBackgroundColor;
+            }
+            if (state.currentPageBackgroundColor !== state.targetPageBackgroundColor) {
+                state.currentPageBackgroundColor = state.targetPageBackgroundColor;
+            }
         }
 
         // 2. Text Color Transition (NEW)
         if (state.isTextColorTransitioning) {
             const progress = Math.min((now - state.textColorTransitionStartTime) / TEXT_COLOR_TRANSITION_DURATION, 1);
-            
+
             const prevRgb = hexToRgb(state.previousTextColorForTransition);
             const targetRgb = hexToRgb(state.targetTextColor);
 
@@ -1130,7 +1262,7 @@ const resetAllButtons = () => {
                 state.isTextColorTransitioning = false;
                 state.currentTextColor = state.targetTextColor;
             }
-        } 
+        }
         // Fallback: If not transitioning, ensure we are at the target color (handles initial load)
         else if (state.currentTextColor !== state.targetTextColor) {
             state.currentTextColor = state.targetTextColor;
@@ -1141,6 +1273,13 @@ const resetAllButtons = () => {
         // This ensures we recalculate the *Target* text color if the background target changes
         if (state.currentAnimatedBackgroundColor !== state.previousFrameAnimatedBgColor) {
             updateOldMenuThemeMetaTag();
+
+            // Pass Hue and Saturation dynamically to CSS for the scrolling page background
+            const hsl = hexToHSL(state.currentPageBackgroundColor);
+            document.documentElement.style.setProperty('--dominant-h', hsl.h);
+            // Double the saturation so the gradient has plenty of color
+            document.documentElement.style.setProperty('--dominant-s', Math.min(100, hsl.s * 100 * 2) + '%');
+
             state.previousFrameAnimatedBgColor = state.currentAnimatedBackgroundColor;
         }
 
@@ -1158,12 +1297,12 @@ const resetAllButtons = () => {
         // Checks if old colors exist and throttles their removal to prevent lag spikes.
         if (state.previousColorPaletteForCleanup.length > 0 && (now - state.paletteChangeTimestampForCleanup > CLEANUP_START_DELAY)) {
             const currentPaletteSet = new Set(state.colorPalette.map(item => item.color.toUpperCase()));
-            
+
             // LIMIT: Only swap this many shapes per frame. 
             // 2 shapes/frame @ 60fps = 120 shapes swapped per second.
             // This is visually fast but computationally cheap.
-            const MAX_SWAPS_PER_FRAME = 2; 
-            
+            const MAX_SWAPS_PER_FRAME = 2;
+
             let shapesMoved = 0;
             let foundOldColor = false;
 
@@ -1171,7 +1310,7 @@ const resetAllButtons = () => {
                 const sd = state.shapesData[i];
                 if (sd.twoShape?.fill) {
                     const shapeColor = sd.twoShape.fill.toUpperCase();
-                    
+
                     // Check if this shape has an old color not in the new palette
                     if (state.previousColorPaletteForCleanup.includes(shapeColor) && !currentPaletteSet.has(shapeColor)) {
                         foundOldColor = true;
@@ -1180,10 +1319,10 @@ const resetAllButtons = () => {
                         if (shapesMoved < MAX_SWAPS_PER_FRAME) {
                             sd.isMarkedForCleanupScaling = true;
                             sd.cleanupScaleStartTime = now;
-                            
+
                             // Fast fade duration (0.8s - 1.5s)
-                            sd.cleanupScaleDuration = rand(5000, 10000); 
-                            
+                            sd.cleanupScaleDuration = rand(5000, 10000);
+
                             state.fadingOutShapesData.push(sd);
                             state.shapesData.splice(i, 1);
                             shapesMoved++;
@@ -1208,11 +1347,11 @@ const resetAllButtons = () => {
             if (sd.twoShape) {
                 const progress = Math.min((now - sd.cleanupScaleStartTime) / sd.cleanupScaleDuration, 1);
                 sd.twoShape.opacity = 1 - easeInOutQuad(progress);
-                
+
                 const perpX = -sd.vy;
                 const perpY = sd.vx;
                 const sway = Math.sin(now * sd.curveFreq + sd.curveOffset) * sd.curveAmp;
-                
+
                 sd.twoShape.translation.x += (sd.vx + perpX * sway) * state.currentMovementSpeedMultiplier;
                 sd.twoShape.translation.y += (sd.vy + perpY * sway) * state.currentMovementSpeedMultiplier;
                 sd.twoShape.rotation += sd.rotationSpeed * state.currentRotationSpeedMultiplier;
@@ -1244,6 +1383,23 @@ const resetAllButtons = () => {
             }
 
             const shape = sd.twoShape;
+
+            if (sd.isColorTransitioning && now >= sd.colorTransitionStartTime) {
+                const progress = Math.min((now - sd.colorTransitionStartTime) / sd.colorTransitionDuration, 1);
+                const prevRgb = hexToRgb(sd.startColor);
+                const targetRgb = hexToRgb(sd.targetColor);
+
+                shape.fill = rgbToHex(
+                    prevRgb.r + (targetRgb.r - prevRgb.r) * progress,
+                    prevRgb.g + (targetRgb.g - prevRgb.g) * progress,
+                    prevRgb.b + (targetRgb.b - prevRgb.b) * progress
+                );
+
+                if (progress >= 1) {
+                    sd.isColorTransitioning = false;
+                }
+            }
+
             const perpX = -sd.vy;
             const perpY = sd.vx;
             const sway = Math.sin(now * sd.curveFreq + sd.curveOffset) * sd.curveAmp;
@@ -1275,7 +1431,7 @@ const resetAllButtons = () => {
             cake.rotation += cake.rotationSpeed * delta;
             cake.element.style.transform = `rotate(${cake.rotation}deg)`;
             cake.element.style.top = `${cake.y}px`;
-            if (cake.y > window.innerHeight) {
+            if (cake.y > window.innerHeight * 1.5) {
                 if (cake.element.parentNode === rainingCakesContainer) {
                     rainingCakesContainer.removeChild(cake.element);
                 }
@@ -1305,7 +1461,7 @@ const resetAllButtons = () => {
 
             const buffer = Math.max(sd.approxWidth, sd.approxHeight) * 0.7;
             if (shape.translation.x < -buffer || shape.translation.x > twoW + buffer || shape.translation.y < -buffer || shape.translation.y > twoH + buffer) {
-                if(shape.parent) two.remove(shape);
+                if (shape.parent) two.remove(shape);
                 state.transitionShapesData.splice(i, 1);
             }
         }
@@ -1315,83 +1471,154 @@ const resetAllButtons = () => {
     /**
  * Handles the physics-like spacing (jiggle) and touch-screen feedback.
  */
-function setupJigglyButtonEffects() {
-    const buttons = document.querySelectorAll('.b-c .b');
-    const scrollContainer = document.querySelector('.b-c');
-    if (buttons.length === 0 || !scrollContainer) return;
+    function setupJigglyButtonEffects() {
+        const buttons = document.querySelectorAll('.b-c .b');
+        const scrollContainer = document.querySelector('.b-c');
+        if (buttons.length === 0 || !scrollContainer) return;
 
-    const buttonArray = Array.from(buttons);
-    const getSUnit = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 75;
+        const buttonArray = Array.from(buttons);
+        const getSUnit = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 75;
 
-    const applyJiggle = (hoveredIndex) => {
-        const basePush = getSUnit() * 0.4;
-        const falloffBase = 0.5;
+        const applyJiggle = (hoveredIndex) => {
+            const basePush = getSUnit() * 0.4;
+            const falloffBase = 0.5;
 
-        buttonArray.forEach((btn, i) => {
-            if (i === hoveredIndex) {
-                btn.style.setProperty('--jiggle-offset', '0px');
-                return;
-            }
-            const distance = Math.abs(i - hoveredIndex);
-            // Geometric series for smooth, diminishing displacement
-            const displacement = basePush * ((1 - Math.pow(falloffBase, distance)) / (1 - falloffBase));
-            const direction = i > hoveredIndex ? 1 : -1;
-            btn.style.setProperty('--jiggle-offset', `${direction * displacement}px`);
+            buttonArray.forEach((btn, i) => {
+                if (i === hoveredIndex) {
+                    btn.style.setProperty('--jiggle-offset', '0px');
+                    return;
+                }
+                const distance = Math.abs(i - hoveredIndex);
+                // Geometric series for smooth, diminishing displacement
+                const displacement = basePush * ((1 - Math.pow(falloffBase, distance)) / (1 - falloffBase));
+                const direction = i > hoveredIndex ? 1 : -1;
+                btn.style.setProperty('--jiggle-offset', `${direction * displacement}px`);
+            });
+        };
+
+        buttonArray.forEach((button, index) => {
+            // --- Desktop Support ---
+            button.addEventListener('mouseenter', () => applyJiggle(index));
+
+            button.addEventListener('mouseleave', (e) => {
+                // Only clear if the mouse isn't moving directly to another button
+                if (!e.relatedTarget || !e.relatedTarget.classList.contains('b')) {
+                    resetAllButtons();
+                }
+            });
+
+            // --- Touch Support ---
+            button.addEventListener('touchstart', () => {
+                // Clear others first to ensure only one is expanded
+                resetAllButtons();
+                applyJiggle(index);
+                button.classList.add('tap-active');
+            }, { passive: true });
         });
-    };
 
-    buttonArray.forEach((button, index) => {
-        // --- Desktop Support ---
-        button.addEventListener('mouseenter', () => applyJiggle(index));
-        
-        button.addEventListener('mouseleave', (e) => {
-            // Only clear if the mouse isn't moving directly to another button
-            if (!e.relatedTarget || !e.relatedTarget.classList.contains('b')) {
+        // Reset when the mouse leaves the entire menu container
+        scrollContainer.addEventListener('mouseleave', resetAllButtons);
+
+        // Reset when tapping empty space on mobile
+        document.addEventListener('touchstart', (e) => {
+            if (!e.target.closest('.b')) {
                 resetAllButtons();
             }
-        });
-
-        // --- Touch Support ---
-        button.addEventListener('touchstart', () => {
-            // Clear others first to ensure only one is expanded
-            resetAllButtons(); 
-            applyJiggle(index);
-            button.classList.add('tap-active');
         }, { passive: true });
-    });
-
-    // Reset when the mouse leaves the entire menu container
-    scrollContainer.addEventListener('mouseleave', resetAllButtons);
-}
+    }
 
     /**
  * Attaches global window/document listeners for state management.
  */
-function setupEventListeners() {
-    // Window Resize Debounce
-    window.addEventListener('resize', debounce(() => {
-        if (state.twoJsCanvas) {
-            applyBlurEffect(clampColorLightness(state.currentAnimatedBackgroundColor));
-            state.twoJsCanvas.style.width = '100%';
-            state.twoJsCanvas.style.height = '100%';
-        }
-    }, 250));
+    function setupEventListeners() {
+        // Window Resize Debounce
+        window.addEventListener('resize', debounce(() => {
+            if (state.twoJsCanvas) {
+                applyBlurEffect(clampColorLightness(state.currentAnimatedBackgroundColor));
+                state.twoJsCanvas.style.width = '100%';
+                state.twoJsCanvas.style.height = '100%';
+            }
+        }, 250));
 
-    // Page Visibility & Focus Logic (The Fix)
-    // Resets bold/spacing if the user switches tabs or minimizes browser
-    window.addEventListener('blur', resetAllButtons);
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            resetAllButtons();
-            handleVisibilityChange(); // Existing visibility pause logic
-        } else {
-            handleVisibilityChange(); // Existing visibility resume logic
+        // Page Visibility & Focus Logic (The Fix)
+        // Resets bold/spacing if the user switches tabs or minimizes browser
+        window.addEventListener('blur', resetAllButtons);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                resetAllButtons();
+                handleVisibilityChange(); // Existing visibility pause logic
+            } else {
+                handleVisibilityChange(); // Existing visibility resume logic
+            }
+        }, false);
+
+        // Apply instantly without re-fetching colors
+        window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+            applyPostProcessingFilters();
+            updateOldMenuElementsStyle(true);
+            updateOldMenuThemeMetaTag();
+        });
+
+        // Initialize the button hover/tap logic
+        setupJigglyButtonEffects();
+
+        // Scroll Indicator Click
+        const scrollIndicator = document.getElementById('scroll-indicator');
+        if (scrollIndicator) {
+            scrollIndicator.addEventListener('click', () => {
+                window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
+
+                // Pause the bouncing animation for 1 second after click
+                scrollIndicator.classList.add('pause-bounce');
+                setTimeout(() => {
+                    scrollIndicator.classList.remove('pause-bounce');
+                }, 750);
+            });
         }
-    }, false);
-    
-    // Initialize the button hover/tap logic
-    setupJigglyButtonEffects();
-}
+
+        // Parallax Effect
+        window.addEventListener('scroll', () => {
+            requestAnimationFrame(() => {
+                const scrollY = window.scrollY;
+                // Background moves at 60% of normal scroll speed
+                const parallaxOffset = scrollY * 0.4;
+                if (container) {
+                    container.style.transform = `translate3d(0, ${parallaxOffset}px, 0)`;
+                }
+                if (rainingCakesContainer) {
+                    rainingCakesContainer.style.transform = `translate3d(0, ${parallaxOffset}px, 0)`;
+                }
+
+                // Update the button mask position so the fade stays locked to the screen
+                const bc = document.querySelector('.b-c');
+                if (bc) {
+                    bc.style.setProperty('--mask-y', `${scrollY}px`);
+                }
+
+                // Shrink signature ONLY when scrolling into the new page
+                const signature = document.querySelector('.signature');
+                if (signature) {
+                    const scaleStart = window.innerHeight * 0.85; // Start when white page fade begins
+                    const scaleEnd = window.innerHeight * 1.15;   // End slightly after crossing into the page
+                    const progress = Math.min(1, Math.max(0, (scrollY - scaleStart) / (scaleEnd - scaleStart)));
+                    const scale = 1 - (0.25 * progress); // 25% reduction = 75% of original size
+                    signature.style.transform = `scale(${scale})`;
+                }
+
+                // Fade out scroll indicator naturally over the first 20% of the scroll
+                const scrollIndicator = document.getElementById('scroll-indicator');
+                if (scrollIndicator) {
+                    const fadeStart = 10;
+                    const fadeEnd = window.innerHeight * 0.2;
+                    let opacity = 1 - ((scrollY - fadeStart) / (fadeEnd - fadeStart));
+                    scrollIndicator.style.opacity = Math.max(0, Math.min(1, opacity));
+                }
+
+                // Update the tab bar color dynamically as we scroll into the new page
+                updateOldMenuThemeMetaTag();
+            });
+        }, { passive: true });
+    }
 
     // --- Initial Calls ---
     if (state.twoJsCanvas) applyBlurEffect(state.currentAnimatedBackgroundColor); // Initial bg might not be clamped yet, okay for first draw
