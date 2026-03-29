@@ -188,13 +188,6 @@ canvas,
 /* --- BUTTONS --- */
 .b {
   opacity: 0.8;
-  --jiggle-offset: 0px;
-  --jello-bezier: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --jello-duration: 0.5s;
-
-  transition: opacity 0.3s ease,
-    transform var(--jello-duration) var(--jello-bezier),
-    font-weight 0.3s ease;
 
   will-change: transform, opacity;
 
@@ -215,26 +208,10 @@ canvas,
   -webkit-user-drag: none;
   pointer-events: auto;
 
-  font-weight: 300 !important;
+  font-weight: 300;
 
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   position: relative;
-  transform: translateY(var(--jiggle-offset)) scale(1);
-}
-
-@media (hover: hover) {
-  .b:hover {
-    opacity: 1;
-    font-weight: 700 !important;
-    transform: translateY(var(--jiggle-offset)) scale(1.1);
-  }
-}
-
-.b.tap-active {
-  opacity: 1 !important;
-  font-weight: 700 !important;
-  transform: translateY(var(--jiggle-offset)) scale(1.1) !important;
-  transition: transform 0.1s var(--jello-bezier), font-weight 0.1s ease;
 }
 
 #lastfm-button {
@@ -314,6 +291,7 @@ canvas,
     align-items: center;
     justify-content: center;
     padding: 0;
+    padding-bottom: 12vh;
     padding-top: calc(var(--s) * 2.5);
     box-sizing: border-box;
   }
@@ -475,4 +453,34 @@ canvas,
 
 .new-white-page>* {
   pointer-events: auto;
+}
+
+.new-white-page h1 {
+  opacity: 1;
+}
+
+.bouncing-text span {
+  display: inline-block;
+  /* 4.5s total duration ensures a ~3 second wait after the letters finish bouncing */
+  animation: bounce-wave 4.5s infinite;
+  animation-delay: calc(var(--i) * 0.08s);
+}
+
+@keyframes bounce-wave {
+  0% {
+    transform: translateY(0);
+    animation-timing-function: ease-out;
+    /* Smooth deceleration as it goes up */
+  }
+
+  7.5% {
+    transform: translateY(-12px);
+    animation-timing-function: ease-in;
+    /* Smooth acceleration as it falls down */
+  }
+
+  15%,
+  100% {
+    transform: translateY(0);
+  }
 }

@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         oldMenu: { btn: null, sigs: null, links: null, favicon: null, themeMeta: null },
         shapesData: [], fadingOutShapesData: [], transitionShapesData: [],
         lastTime: performance.now(),
+        jiggly: { isHoveringContainer: false, touchedIndex: -1 },
         twoJsCanvas: null
     };
 
@@ -253,19 +254,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scrollIndicator) {
             scrollIndicator.style.color = colorHex;
         }
+
+        // Apply to Coming Soon text
+        const comingSoonText = document.querySelector('.new-white-page h1');
+        if (comingSoonText) {
+            comingSoonText.style.color = colorHex;
+        }
     }
 
     /**
- * Forcefully resets all buttons to their default state:
- * - Removes the "tap-active" class (resets font-weight to 300)
- * - Sets jiggle-offset to 0 (resets spacing)
+ * Forcefully resets all buttons to their default state
  */
     const resetAllButtons = () => {
-        const buttons = document.querySelectorAll('.b-c .b');
-        buttons.forEach(btn => {
-            btn.classList.remove('tap-active');
-            btn.style.setProperty('--jiggle-offset', '0px');
-        });
+        state.jiggly.isHoveringContainer = false;
+        state.jiggly.touchedIndex = -1;
     };
 
     function normalizeAndCapWeights(palette, cap = 50, boost = 5) {
@@ -796,44 +798,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches;
             let hsl = hexToHSL(color);
 
-            if (isLightMode) {
-                // Emulate light mode CSS: invert(1) saturate(200%)
-                hsl.l = 1 - hsl.l;
-                hsl.s = Math.min(1, hsl.s * 2.0);
-            } else {
-                // Emulate dark mode CSS: brightness(30%) saturate(350%)
-                hsl.l = Math.max(0, hsl.l * (state.currentBrightness / 100));
-                hsl.s = Math.min(1, hsl.s * (state.currentSaturation / 100));
-            }
+            // Always use the new page background color for the tab bar
+            const targetLightness = isLightMode ? 0.90 : 0.20; // Matches --page-bg-l in CSS
+            const targetS = Math.min(1, hsl.s * 2.0);
+            const targetColorHex = hslToHex(hsl.h, targetS, targetLightness);
 
-            color = hslToHex(hsl.h, hsl.s, hsl.l);
-
-            // Dynamically blend the tab bar into the scrolling page's background color when scrolling down
-            const scrollY = window.scrollY;
-            const fadeStart = window.innerHeight * 0.05; // Start fading tab bar early
-            const fadeEnd = window.innerHeight * 0.4;    // Fully matched before half screen down
-
-            if (scrollY > fadeStart) {
-                const targetLightness = isLightMode ? 0.90 : 0.20; // Matches --page-bg-l in CSS
-                const targetS = Math.min(1, hexToHSL(state.currentAnimatedBackgroundColor).s * 2.0);
-                const targetColorHex = hslToHex(hsl.h, targetS, targetLightness);
-
-                const progress = Math.min(1, (scrollY - fadeStart) / (fadeEnd - fadeStart));
-
-                if (progress >= 1) {
-                    color = targetColorHex;
-                } else {
-                    const cRgb = hexToRgb(color);
-                    const tRgb = hexToRgb(targetColorHex);
-                    color = rgbToHex(
-                        cRgb.r + (tRgb.r - cRgb.r) * progress,
-                        cRgb.g + (tRgb.g - cRgb.g) * progress,
-                        cRgb.b + (tRgb.b - cRgb.b) * progress
-                    );
-                }
-            }
-
-            state.oldMenu.themeMeta.content = color;
+            state.oldMenu.themeMeta.content = targetColorHex;
         }
     }
 
@@ -1476,55 +1446,151 @@ document.addEventListener('DOMContentLoaded', () => {
         const scrollContainer = document.querySelector('.b-c');
         if (buttons.length === 0 || !scrollContainer) return;
 
-        const buttonArray = Array.from(buttons);
         const getSUnit = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 75;
 
-        const applyJiggle = (hoveredIndex) => {
-            const basePush = getSUnit() * 0.4;
-            const falloffBase = 0.5;
+        const buttonStates = Array.from(buttons).map(btn => ({
+            el: btn,
+            targetY: 0, currentY: 0,
+            targetScale: 1, currentScale: 1,
+            targetWeight: 300, currentWeight: 300,
+            targetOpacity: 0.8, currentOpacity: 0.8,
+            baseOffsetTop: btn.offsetTop,
+            baseOffsetLeft: btn.offsetLeft,
+            baseOffsetWidth: btn.offsetWidth,
+            baseOffsetHeight: btn.offsetHeight
+        }));
 
-            buttonArray.forEach((btn, i) => {
-                if (i === hoveredIndex) {
-                    btn.style.setProperty('--jiggle-offset', '0px');
-                    return;
-                }
-                const distance = Math.abs(i - hoveredIndex);
-                // Geometric series for smooth, diminishing displacement
-                const displacement = basePush * ((1 - Math.pow(falloffBase, distance)) / (1 - falloffBase));
-                const direction = i > hoveredIndex ? 1 : -1;
-                btn.style.setProperty('--jiggle-offset', `${direction * displacement}px`);
-            });
-        };
+        let mouseX = -1000;
+        let mouseY = -1000;
 
-        buttonArray.forEach((button, index) => {
-            // --- Desktop Support ---
-            button.addEventListener('mouseenter', () => applyJiggle(index));
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
 
-            button.addEventListener('mouseleave', (e) => {
-                // Only clear if the mouse isn't moving directly to another button
-                if (!e.relatedTarget || !e.relatedTarget.classList.contains('b')) {
-                    resetAllButtons();
-                }
-            });
+        scrollContainer.addEventListener('mouseenter', () => state.jiggly.isHoveringContainer = true);
+        scrollContainer.addEventListener('mouseleave', () => state.jiggly.isHoveringContainer = false);
 
-            // --- Touch Support ---
-            button.addEventListener('touchstart', () => {
-                // Clear others first to ensure only one is expanded
+        buttons.forEach((btn, i) => {
+            btn.addEventListener('touchstart', () => {
                 resetAllButtons();
-                applyJiggle(index);
-                button.classList.add('tap-active');
+                state.jiggly.touchedIndex = i;
             }, { passive: true });
         });
 
-        // Reset when the mouse leaves the entire menu container
-        scrollContainer.addEventListener('mouseleave', resetAllButtons);
-
-        // Reset when tapping empty space on mobile
         document.addEventListener('touchstart', (e) => {
             if (!e.target.closest('.b')) {
                 resetAllButtons();
             }
         }, { passive: true });
+
+        // Reset selection when the user lifts their finger anywhere
+        document.addEventListener('touchend', resetAllButtons, { passive: true });
+        document.addEventListener('touchcancel', resetAllButtons, { passive: true });
+
+        function animate() {
+            const sUnit = getSUnit();
+            const maxDist = sUnit * 3;
+            const basePush = sUnit * 0.4;
+            const containerRect = scrollContainer.getBoundingClientRect();
+
+            // Safely update base metrics only when not interacting and animations have settled
+            // This prevents the font-weight layout shift from causing an infinite jitter loop
+            const isInteracting = state.jiggly.isHoveringContainer || state.jiggly.touchedIndex !== -1;
+            const allAtRest = buttonStates.every(b => Math.abs(b.currentWeight - 300) < 1 && Math.abs(b.currentScale - 1) < 0.01);
+
+            if (!isInteracting && allAtRest) {
+                buttonStates.forEach(bState => {
+                    bState.baseOffsetTop = bState.el.offsetTop;
+                    bState.baseOffsetLeft = bState.el.offsetLeft;
+                    bState.baseOffsetWidth = bState.el.offsetWidth;
+                    bState.baseOffsetHeight = bState.el.offsetHeight;
+                });
+            }
+
+            buttonStates.forEach((bState, i) => {
+                // Base calculations off of cached offsets rather than dynamic ones
+                const baseTop = bState.baseOffsetTop + containerRect.top;
+                const baseLeft = bState.baseOffsetLeft + containerRect.left;
+                const btnWidth = bState.baseOffsetWidth;
+                const btnHeight = bState.baseOffsetHeight;
+
+                let maxHoverBonus = 0.4;
+                let maxTouchBonus = 0.1;
+                if (btnWidth > 0) {
+                    let safeScale = window.innerWidth <= 768 ? (window.innerWidth - 40) / btnWidth : (window.innerWidth - baseLeft - 40) / btnWidth;
+                    maxHoverBonus = Math.min(0.4, Math.max(0, safeScale - 1));
+                    maxTouchBonus = Math.min(0.1, Math.max(0, safeScale - 1));
+                }
+
+                if (state.jiggly.touchedIndex !== -1) {
+                    if (i === state.jiggly.touchedIndex) {
+                        bState.targetY = 0;
+                        bState.targetScale = 1 + maxTouchBonus;
+                        bState.targetWeight = 700;
+                        bState.targetOpacity = 1;
+                    } else {
+                        const distance = Math.abs(i - state.jiggly.touchedIndex);
+                        const displacement = basePush * ((1 - Math.pow(0.5, distance)) / (1 - 0.5));
+                        const direction = i > state.jiggly.touchedIndex ? 1 : -1;
+                        bState.targetY = direction * displacement;
+                        bState.targetScale = 1;
+                        bState.targetWeight = 300;
+                        bState.targetOpacity = 0.8;
+                    }
+                } else if (!state.jiggly.isHoveringContainer) {
+                    bState.targetY = 0;
+                    bState.targetScale = 1;
+                    bState.targetWeight = 300;
+                    bState.targetOpacity = 0.8;
+                } else {
+                    const btnCenterY = baseTop + btnHeight / 2;
+                    const btnCenterX = baseLeft + btnWidth / 2;
+
+                    const distY = Math.abs(mouseY - btnCenterY);
+                    const distX = Math.abs(mouseX - btnCenterX);
+
+                    let curve = 0;
+                    if (distX < Math.max(300, window.innerWidth * 0.5)) {
+                        // Calculate influence factor, clamped between 0 and 1 to prevent negative values
+                        const factor = Math.max(0, 1 - (distY / maxDist));
+                        // Apply a sine curve for a smooth, natural ease-in and ease-out effect
+                        curve = Math.sin(factor * Math.PI / 2);
+                    }
+
+                    // Apply a sharper exponent to make the scale drop off much faster
+                    const scaleCurve = Math.pow(curve, 2);
+                    bState.targetScale = 1 + (maxHoverBonus * scaleCurve);
+                    bState.targetOpacity = 0.8 + (0.2 * curve);
+                    bState.targetWeight = 300 + (400 * curve);
+
+                    let pushY = 0;
+                    const signedDistY = btnCenterY - mouseY;
+                    if (distX < Math.max(300, window.innerWidth * 0.5) && Math.abs(signedDistY) < maxDist * 1.5) {
+                        const normalizedDist = signedDistY / (maxDist * 1.5);
+                        // Smooth curve that is 0 at the cursor, peaks slightly away, and tapers to 0 at the edge
+                        const pushCurve = normalizedDist * Math.pow(1 - Math.abs(normalizedDist), 2);
+                        pushY = pushCurve * basePush * 4;
+                    }
+                    bState.targetY = pushY;
+                }
+            });
+
+            buttonStates.forEach(bState => {
+                bState.currentY += (bState.targetY - bState.currentY) * 0.2;
+                bState.currentScale += (bState.targetScale - bState.currentScale) * 0.2;
+                bState.currentWeight += (bState.targetWeight - bState.currentWeight) * 0.2;
+                bState.currentOpacity += (bState.targetOpacity - bState.currentOpacity) * 0.2;
+
+                bState.el.style.transform = `translateY(${bState.currentY}px) scale(${bState.currentScale})`;
+                bState.el.style.fontWeight = Math.round(bState.currentWeight);
+                bState.el.style.opacity = bState.currentOpacity;
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
     }
 
     /**
@@ -1613,9 +1679,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     let opacity = 1 - ((scrollY - fadeStart) / (fadeEnd - fadeStart));
                     scrollIndicator.style.opacity = Math.max(0, Math.min(1, opacity));
                 }
-
-                // Update the tab bar color dynamically as we scroll into the new page
-                updateOldMenuThemeMetaTag();
             });
         }, { passive: true });
     }
