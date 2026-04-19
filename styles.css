@@ -29,7 +29,14 @@ body {
   overflow-y: auto;
   background-color: #121212;
   min-height: 100vh;
-  font-family: 'Fustat', 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Google Sans Flex", 'Segoe UI Variable', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+  font-variation-settings:
+    "slnt" 0,
+    "wdth" 100,
+    "GRAD" 0,
+    "ROND" 0;
   color: #EAEAEA;
 }
 
@@ -128,7 +135,6 @@ canvas,
   left: 0;
   padding: var(--s);
   z-index: 100;
-  font-family: Fustat, sans-serif;
   pointer-events: none;
   width: 100%;
   box-sizing: border-box;
@@ -181,7 +187,6 @@ canvas,
   -webkit-mask-image: linear-gradient(to bottom, transparent var(--mask-y), transparent calc(var(--mask-y) + 15px), black calc(var(--mask-y) + var(--s) + 25px), black 100%);
   mask-image: linear-gradient(to bottom, transparent var(--mask-y), transparent calc(var(--mask-y) + 15px), black calc(var(--mask-y) + var(--s) + 25px), black 100%);
   box-sizing: border-box;
-  font-family: Fustat, sans-serif;
   pointer-events: none;
 }
 
