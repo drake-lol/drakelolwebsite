@@ -167,12 +167,12 @@ canvas,
   top: 0;
   left: 0;
   width: 100%;
-  min-height: 100%;
-  height: auto;
+  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-end;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
   z-index: 3;
   padding: var(--s);
   padding-top: calc(var(--s) * 2.5);
@@ -217,6 +217,10 @@ canvas,
 #lastfm-button {
   word-wrap: break-word;
   white-space: normal;
+}
+
+.button-text {
+  pointer-events: none;
 }
 
 /* --- RAINING CAKE --- */
@@ -288,8 +292,8 @@ canvas,
     height: auto;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    align-items: center !important;
+    justify-content: center !important;
     padding: 0;
     padding-bottom: 12vh;
     padding-top: calc(var(--s) * 2.5);

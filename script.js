@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- State ---
     const state = {
         isPaused: false, pausedByVisibility: false,
+        enableNewPageScroll: false, // Toggle this to false to turn off scrolling and hide the arrow
         currentNumShapes: 60, currentScaleMultiplier: 1.0, currentRotationSpeedMultiplier: 1.0,
         currentMovementSpeedMultiplier: 1.0, currentNumTransitionShapes: 10, currentBlurIntensity: 200,
         currentResolutionIndex: 2, previousResolutionIndex: 0,
@@ -269,6 +270,54 @@ document.addEventListener('DOMContentLoaded', () => {
         state.jiggly.isHoveringContainer = false;
         state.jiggly.touchedIndex = -1;
     };
+
+    function wrapTextInWords(btn) {
+        const span = btn.querySelector('.button-text');
+        if (!span) return [];
+
+        const text = btn.getAttribute('data-text') || span.textContent || span.innerText;
+        const words = text.split(/\s+/).filter(w => w.length > 0);
+        span.innerHTML = '';
+
+        const wordStates = [];
+        words.forEach((word, index) => {
+            const wSpan = document.createElement('span');
+            wSpan.textContent = word;
+            wSpan.style.display = 'inline-block';
+            wSpan.style.willChange = 'transform';
+
+            span.appendChild(wSpan);
+            if (index < words.length - 1) {
+                span.appendChild(document.createTextNode(' '));
+            }
+
+            wordStates.push({
+                el: wSpan, currentX: null, currentY: null, targetX: 0, targetY: 0
+            });
+        });
+        return wordStates;
+    }
+
+    function updateButtonText(btn, newText) {
+        let textSpan = btn.querySelector('.button-text');
+        if (!textSpan) {
+            btn.innerHTML = '<span class="button-text"></span>';
+            textSpan = btn.querySelector('.button-text');
+        }
+        let currentText = btn.getAttribute('data-text') || textSpan.textContent || textSpan.innerText;
+        if (currentText.replace(/\s+/g, ' ').trim() === newText.replace(/\s+/g, ' ').trim()) return;
+        textSpan.textContent = newText;
+        btn.setAttribute('data-text', newText);
+        if (state.jiggly && state.jiggly.buttonStates) {
+            const bState = state.jiggly.buttonStates.find(b => b.el === btn);
+            if (bState) {
+                bState.wordStates = wrapTextInWords(btn);
+                bState.lastRoundedWeight = -1; // Force re-measure next frame
+                bState.needsMeasurement = true;
+                bState.needsWordMeasurement = true;
+            }
+        }
+    }
 
     function normalizeAndCapWeights(palette, cap = 50, boost = 5) {
         let p = JSON.parse(JSON.stringify(palette));
@@ -863,15 +912,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (state.oldMenu.btn) {
-                state.oldMenu.btn.textContent = `Listening to ${trackName} by ${artistName}`;
-                // Set it directly to the Last.fm link
+                updateButtonText(state.oldMenu.btn, `Listening to ${trackName} by ${artistName}`);
                 state.oldMenu.btn.href = lastFmTrackUrl;
             }
 
         } else {
-            // Not playing
             if (state.oldMenu.btn) {
-                state.oldMenu.btn.textContent = "Last.fm";
+                updateButtonText(state.oldMenu.btn, "Last.fm");
                 state.oldMenu.btn.href = user ? `https://www.last.fm/user/${user}` : "#";
             }
         }
@@ -1446,30 +1493,53 @@ document.addEventListener('DOMContentLoaded', () => {
         const scrollContainer = document.querySelector('.b-c');
         if (buttons.length === 0 || !scrollContainer) return;
 
+        buttons.forEach(btn => {
+            const span = btn.querySelector('.button-text');
+            if (span) btn.setAttribute('data-text', span.textContent || span.innerText);
+
+        });
+
         const getSUnit = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 75;
 
         const buttonStates = Array.from(buttons).map(btn => ({
             el: btn,
+            wordStates: wrapTextInWords(btn),
             targetY: 0, currentY: 0,
             targetScale: 1, currentScale: 1,
             targetWeight: 300, currentWeight: 300,
             targetOpacity: 0.8, currentOpacity: 0.8,
+            targetShiftRatio: 0.5, currentShiftRatio: 0.5,
             baseOffsetTop: btn.offsetTop,
             baseOffsetLeft: btn.offsetLeft,
             baseOffsetWidth: btn.offsetWidth,
-            baseOffsetHeight: btn.offsetHeight
+            baseOffsetHeight: btn.offsetHeight,
+            targetHeight: btn.offsetHeight,
+            currentHeight: btn.offsetHeight,
+            needsMeasurement: true,
+            lastRoundedWeight: -1,
+            needsWordMeasurement: true
         }));
 
-        let mouseX = -1000;
-        let mouseY = -1000;
+        state.jiggly.buttonStates = buttonStates;
+        let mouseX = -99999;
+        let mouseY = -99999;
 
         window.addEventListener('mousemove', (e) => {
             mouseX = e.clientX;
             mouseY = e.clientY;
         });
-
-        scrollContainer.addEventListener('mouseenter', () => state.jiggly.isHoveringContainer = true);
-        scrollContainer.addEventListener('mouseleave', () => state.jiggly.isHoveringContainer = false);
+        document.addEventListener('mouseleave', (e) => {
+            if (e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight) {
+                mouseX = -99999;
+                mouseY = -99999;
+            }
+        });
+        window.addEventListener('mouseout', (e) => {
+            if (!e.relatedTarget) {
+                mouseX = -99999;
+                mouseY = -99999;
+            }
+        });
 
         buttons.forEach((btn, i) => {
             btn.addEventListener('touchstart', () => {
@@ -1488,11 +1558,35 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('touchend', resetAllButtons, { passive: true });
         document.addEventListener('touchcancel', resetAllButtons, { passive: true });
 
+        let maxFirstFourWidth = Math.max(...buttonStates.slice(0, 4).map(b => b.baseOffsetWidth));
+
         function animate() {
             const sUnit = getSUnit();
             const maxDist = sUnit * 3;
             const basePush = sUnit * 0.4;
             const containerRect = scrollContainer.getBoundingClientRect();
+
+            const firstBtnTop = buttonStates[0].baseOffsetTop + containerRect.top;
+            const lastBtnBottom = buttonStates[buttonStates.length - 1].baseOffsetTop + containerRect.top + buttonStates[buttonStates.length - 1].baseOffsetHeight;
+            let outsideDistY = 0;
+            if (mouseY < firstBtnTop) outsideDistY = firstBtnTop - mouseY;
+            else if (mouseY > lastBtnBottom) outsideDistY = mouseY - lastBtnBottom;
+            const containerFactorY = Math.max(0, 1 - (outsideDistY / maxDist));
+
+            // Mathematically track proximity to bypass dead-space gaps
+            let minDistanceToAnyButton = Infinity;
+            buttonStates.forEach((bState, i) => {
+                const baseTop = bState.baseOffsetTop + containerRect.top;
+                const baseLeft = bState.baseOffsetLeft + containerRect.left;
+                const btnCenterY = baseTop + bState.baseOffsetHeight / 2;
+                const effectiveBtnWidth = i < 4 ? maxFirstFourWidth : bState.baseOffsetWidth;
+                const distY = Math.abs(mouseY - btnCenterY);
+                const distX = mouseX < baseLeft ? Math.max(0, baseLeft - mouseX) : Math.max(0, mouseX - (baseLeft + effectiveBtnWidth));
+                if (mouseX >= 0 && distX < maxDist && distY < maxDist * 1.5) {
+                    minDistanceToAnyButton = Math.min(minDistanceToAnyButton, distY);
+                }
+            });
+            state.jiggly.isHoveringContainer = minDistanceToAnyButton < maxDist * 1.5;
 
             // Safely update base metrics only when not interacting and animations have settled
             // This prevents the font-weight layout shift from causing an infinite jitter loop
@@ -1501,11 +1595,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!isInteracting && allAtRest) {
                 buttonStates.forEach(bState => {
+                    if (bState.el.style.height !== 'auto') {
+                        bState.el.style.height = 'auto';
+                        bState.el.style.marginBottom = '0px';
+                    }
+                });
+
+                buttonStates.forEach(bState => {
+                    bState.currentHeight = bState.el.offsetHeight;
+                    bState.targetHeight = bState.currentHeight;
                     bState.baseOffsetTop = bState.el.offsetTop;
                     bState.baseOffsetLeft = bState.el.offsetLeft;
                     bState.baseOffsetWidth = bState.el.offsetWidth;
                     bState.baseOffsetHeight = bState.el.offsetHeight;
                 });
+                maxFirstFourWidth = Math.max(...buttonStates.slice(0, 4).map(b => b.baseOffsetWidth));
             }
 
             buttonStates.forEach((bState, i) => {
@@ -1514,11 +1618,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const baseLeft = bState.baseOffsetLeft + containerRect.left;
                 const btnWidth = bState.baseOffsetWidth;
                 const btnHeight = bState.baseOffsetHeight;
+                const effectiveBtnWidth = i < 4 ? maxFirstFourWidth : btnWidth;
 
                 let maxHoverBonus = 0.4;
                 let maxTouchBonus = 0.1;
-                if (btnWidth > 0) {
-                    let safeScale = window.innerWidth <= 768 ? (window.innerWidth - 40) / btnWidth : (window.innerWidth - baseLeft - 40) / btnWidth;
+                if (effectiveBtnWidth > 0) {
+                    let safeScale = window.innerWidth <= 768 ? (window.innerWidth - 40) / effectiveBtnWidth : (window.innerWidth - baseLeft - 40) / effectiveBtnWidth;
                     maxHoverBonus = Math.min(0.4, Math.max(0, safeScale - 1));
                     maxTouchBonus = Math.min(0.1, Math.max(0, safeScale - 1));
                 }
@@ -1529,6 +1634,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         bState.targetScale = 1 + maxTouchBonus;
                         bState.targetWeight = 700;
                         bState.targetOpacity = 1;
+                        bState.targetShiftRatio = 0.5;
                     } else {
                         const distance = Math.abs(i - state.jiggly.touchedIndex);
                         const displacement = basePush * ((1 - Math.pow(0.5, distance)) / (1 - 0.5));
@@ -1537,53 +1643,131 @@ document.addEventListener('DOMContentLoaded', () => {
                         bState.targetScale = 1;
                         bState.targetWeight = 300;
                         bState.targetOpacity = 0.8;
+                        bState.targetShiftRatio = 0.5;
                     }
                 } else if (!state.jiggly.isHoveringContainer) {
                     bState.targetY = 0;
                     bState.targetScale = 1;
                     bState.targetWeight = 300;
                     bState.targetOpacity = 0.8;
+                    bState.targetShiftRatio = 0.5;
                 } else {
                     const btnCenterY = baseTop + btnHeight / 2;
-                    const btnCenterX = baseLeft + btnWidth / 2;
+
+                    let shiftRatio = 0.5;
+                    if (btnHeight > 0) {
+                        const localY = mouseY - baseTop;
+                        shiftRatio = Math.max(0, Math.min(1, localY / btnHeight));
+                    }
+                    bState.targetShiftRatio = shiftRatio;
 
                     const distY = Math.abs(mouseY - btnCenterY);
-                    const distX = Math.abs(mouseX - btnCenterX);
+                    const distX = mouseX < baseLeft ? Math.max(0, baseLeft - mouseX) : Math.max(0, mouseX - (baseLeft + effectiveBtnWidth));
 
                     let curve = 0;
-                    if (distX < Math.max(300, window.innerWidth * 0.5)) {
-                        // Calculate influence factor, clamped between 0 and 1 to prevent negative values
-                        const factor = Math.max(0, 1 - (distY / maxDist));
-                        // Apply a sine curve for a smooth, natural ease-in and ease-out effect
-                        curve = Math.sin(factor * Math.PI / 2);
+                    const factorY = Math.max(0, 1 - (distY / maxDist));
+                    const factorX = Math.max(0, 1 - (distX / maxDist));
+                    const factor = factorX * factorY;
+
+                    if (factor > 0 && mouseX >= 0) {
+                        // Steep exponential falloff horizontally (outside), smooth sine curve vertically (between buttons)
+                        curve = Math.pow(factorX, 6) * Math.sin(factorY * Math.PI / 2);
+                        curve = Math.pow(factorX, 6) * Math.sin(factorY * Math.PI / 2) * Math.pow(containerFactorY, 6);
                     }
 
-                    // Apply a sharper exponent to make the scale drop off much faster
-                    const scaleCurve = Math.pow(curve, 2);
-                    bState.targetScale = 1 + (maxHoverBonus * scaleCurve);
+                    bState.targetScale = 1 + (maxHoverBonus * curve);
                     bState.targetOpacity = 0.8 + (0.2 * curve);
                     bState.targetWeight = 300 + (400 * curve);
 
                     let pushY = 0;
                     const signedDistY = btnCenterY - mouseY;
-                    if (distX < Math.max(300, window.innerWidth * 0.5) && Math.abs(signedDistY) < maxDist * 1.5) {
+                    if (factor > 0 && mouseX >= 0 && Math.abs(signedDistY) < maxDist * 1.5) {
                         const normalizedDist = signedDistY / (maxDist * 1.5);
-                        // Smooth curve that is 0 at the cursor, peaks slightly away, and tapers to 0 at the edge
+                        // Smooth curve vertically, sharp drop-off horizontally
                         const pushCurve = normalizedDist * Math.pow(1 - Math.abs(normalizedDist), 2);
-                        pushY = pushCurve * basePush * 4;
+                        pushY = pushCurve * basePush * 4 * Math.pow(factorX, 6);
+                        pushY = pushCurve * basePush * 4 * Math.pow(factorX, 6) * Math.pow(containerFactorY, 6);
                     }
                     bState.targetY = pushY;
                 }
             });
 
+            // 1. Apply font-weight
             buttonStates.forEach(bState => {
-                bState.currentY += (bState.targetY - bState.currentY) * 0.2;
-                bState.currentScale += (bState.targetScale - bState.currentScale) * 0.2;
-                bState.currentWeight += (bState.targetWeight - bState.currentWeight) * 0.2;
-                bState.currentOpacity += (bState.targetOpacity - bState.currentOpacity) * 0.2;
+                bState.currentWeight += (bState.targetWeight - bState.currentWeight) * 0.15;
+                const roundedWeight = Math.round(bState.currentWeight);
+
+                if (bState.lastRoundedWeight !== roundedWeight) {
+                    bState.el.style.fontWeight = roundedWeight;
+                    bState.el.style.height = 'auto'; // allow natural reflow
+                    bState.lastRoundedWeight = roundedWeight;
+                    bState.needsMeasurement = true;
+                    bState.needsWordMeasurement = true;
+                }
+            });
+
+            // 2. Measure natural word offsets and height exactly once per frame (avoids layout thrashing)
+            buttonStates.forEach(bState => {
+                if (bState.needsMeasurement) {
+                    bState.targetHeight = bState.el.offsetHeight;
+                    bState.needsMeasurement = false;
+                }
+                if (bState.needsWordMeasurement) {
+                    bState.wordStates.forEach(wState => {
+                        wState.targetX = wState.el.offsetLeft;
+                        wState.targetY = wState.el.offsetTop;
+                        if (wState.currentX === null) {
+                            wState.currentX = wState.targetX;
+                            wState.currentY = wState.targetY;
+                        }
+                    });
+                    bState.needsWordMeasurement = false;
+                }
+            });
+
+            // 3. Interpolate positions and apply transforms
+            buttonStates.forEach(bState => {
+                if (isInteracting || !allAtRest) {
+                    if (Math.abs(bState.targetHeight - bState.currentHeight) > 0.5) {
+                        bState.currentHeight += (bState.targetHeight - bState.currentHeight) * 0.15;
+                        bState.el.style.height = bState.currentHeight + 'px';
+                    } else {
+                        bState.currentHeight = bState.targetHeight;
+                        bState.el.style.height = bState.targetHeight + 'px';
+                    }
+                    // Apply negative margin to prevent pushing sibling elements upwards
+                    bState.el.style.marginBottom = (bState.baseOffsetHeight - bState.currentHeight) + 'px';
+
+                    bState.currentShiftRatio += (bState.targetShiftRatio - bState.currentShiftRatio) * 0.15;
+
+                    // Apply negative margin to distribute expansion up and down based on cursor position
+                    bState.el.style.marginBottom = ((bState.baseOffsetHeight - bState.currentHeight) * (1 - bState.currentShiftRatio)) + 'px';
+                    // We scale the ratio so it only ever shifts upwards by a maximum of half a line
+                    bState.el.style.marginBottom = ((bState.baseOffsetHeight - bState.currentHeight) * (0.5 + (1 - bState.currentShiftRatio) * 0.5)) + 'px';
+                }
+                bState.wordStates.forEach(wState => {
+                    if (wState.currentX !== null) {
+                        wState.currentX += (wState.targetX - wState.currentX) * 0.15;
+                        wState.currentY += (wState.targetY - wState.currentY) * 0.15;
+
+                        const tx = wState.currentX - wState.targetX;
+                        const ty = wState.currentY - wState.targetY;
+
+                        if (Math.abs(tx) > 0.5 || Math.abs(ty) > 0.5) {
+                            wState.el.style.transform = `translate(${tx}px, ${ty}px)`;
+                        } else {
+                            wState.currentX = wState.targetX;
+                            wState.currentY = wState.targetY;
+                            wState.el.style.transform = 'none';
+                        }
+                    }
+                });
+
+                bState.currentY += (bState.targetY - bState.currentY) * 0.15;
+                bState.currentScale += (bState.targetScale - bState.currentScale) * 0.15;
+                bState.currentOpacity += (bState.targetOpacity - bState.currentOpacity) * 0.15;
 
                 bState.el.style.transform = `translateY(${bState.currentY}px) scale(${bState.currentScale})`;
-                bState.el.style.fontWeight = Math.round(bState.currentWeight);
                 bState.el.style.opacity = bState.currentOpacity;
             });
 
@@ -1603,6 +1787,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 applyBlurEffect(clampColorLightness(state.currentAnimatedBackgroundColor));
                 state.twoJsCanvas.style.width = '100%';
                 state.twoJsCanvas.style.height = '100%';
+            }
+            if (state.jiggly && state.jiggly.buttonStates) {
+                state.jiggly.buttonStates.forEach(bState => {
+                    bState.lastRoundedWeight = -1; // force remeasure properly
+                    bState.needsMeasurement = true;
+                    bState.el.style.height = 'auto';
+                    bState.el.style.marginBottom = '0px';
+                    bState.needsWordMeasurement = true;
+                    bState.wordStates.forEach(wState => {
+                        wState.currentX = null; // Snap instantly on resize
+                    });
+                });
             }
         }, 250));
 
@@ -1683,6 +1879,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: true });
     }
 
+    // --- NEW: Toggle New Page Scroll ---
+    window.toggleNewPageScroll = (enable) => {
+        state.enableNewPageScroll = enable;
+        const newPage = document.querySelector('.new-white-page');
+        const scrollIndicator = document.getElementById('scroll-indicator');
+
+        if (enable) {
+            if (newPage) newPage.style.display = '';
+            if (scrollIndicator) scrollIndicator.style.display = '';
+            document.body.style.overflowY = 'auto';
+        } else {
+            if (newPage) newPage.style.display = 'none';
+            if (scrollIndicator) scrollIndicator.style.display = 'none';
+            document.body.style.overflowY = 'hidden';
+            window.scrollTo(0, 0); // Snap back to top
+        }
+    };
+
     // --- Initial Calls ---
     if (state.twoJsCanvas) applyBlurEffect(state.currentAnimatedBackgroundColor); // Initial bg might not be clamped yet, okay for first draw
     applyPostProcessingFilters();
@@ -1692,4 +1906,5 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDefaultColors(); // Clamps defaults
     fetchLastFmData(); // Fetches and clamps Last.fm colors
     resetLastFmInterval();
+    window.toggleNewPageScroll(state.enableNewPageScroll);
 });
