@@ -1539,6 +1539,7 @@ document.addEventListener('DOMContentLoaded', () => {
             targetShiftRatio: 0.5, currentShiftRatio: 0.5,
             baseOffsetTop: btn.offsetTop,
             baseOffsetLeft: btn.offsetLeft,
+            trueBtnWidth: btn.offsetWidth,
             baseOffsetWidth: btn.offsetWidth,
             baseOffsetHeight: btn.offsetHeight,
             targetHeight: btn.offsetHeight,
@@ -1602,31 +1603,14 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (mouseY > lastBtnBottom) outsideDistY = mouseY - lastBtnBottom;
             const containerFactorY = Math.max(0, 1 - (outsideDistY / maxDist));
 
-            // Dynamically construct a bounding polygon to prevent snapping when moving vertically off long buttons
-            let blendedWidth = maxFirstFourWidth;
-            if (buttonStates.length >= 5) {
-                const btn4 = buttonStates[3];
-                const btn5 = buttonStates[4];
-                const btn4CenterY = btn4.baseOffsetTop + containerRect.top + btn4.baseOffsetHeight / 2;
-                const btn5CenterY = btn5.baseOffsetTop + containerRect.top + btn5.baseOffsetHeight / 2;
+            const horizontalFalloff = maxDist * 1.5;
+            let isHoveringContainer = false;
+            let globalHoverFactorX = 0;
 
-                const isDefaultLastFm = (btn5.el.getAttribute('data-text') || '').trim().toLowerCase() === 'last.fm';
-                const lastFmWidth = isDefaultLastFm ? maxFirstFourWidth : btn5.baseOffsetWidth;
-
-                if (mouseY >= btn5CenterY) {
-                    blendedWidth = lastFmWidth;
-                } else if (mouseY <= btn4CenterY) {
-                    blendedWidth = maxFirstFourWidth;
-                } else {
-                    const ratio = (mouseY - btn4CenterY) / (btn5CenterY - btn4CenterY);
-                    const smoothRatio = ratio * ratio * (3 - 2 * ratio); // Silky smoothstep curve
-                    blendedWidth = maxFirstFourWidth + (lastFmWidth - maxFirstFourWidth) * smoothRatio;
-                }
-            }
-
-            let minDistanceToAnyButton = Infinity;
             buttonStates.forEach((bState) => {
                 const baseTop = bState.baseOffsetTop + containerRect.top;
+                const baseLeft = bState.baseOffsetLeft + containerRect.left;
+                const btnWidth = bState.trueBtnWidth || bState.baseOffsetWidth;
                 const btnCenterY = baseTop + bState.baseOffsetHeight / 2;
                 let distY = Math.abs(mouseY - btnCenterY);
 
@@ -1635,17 +1619,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     distY /= 1.5;
                 }
 
-                if (mouseX >= 0 && distY < maxDist * 1.5) {
-                    minDistanceToAnyButton = Math.min(minDistanceToAnyButton, distY);
+                // Calculate max width including maximum hover scale + roughly 15% width added by font-weight expansion
+                let maxHoverBonus = 0.4;
+                if (btnWidth > 0) {
+                    let safeScale = window.innerWidth <= 768 ? (window.innerWidth - 50) / btnWidth : (window.innerWidth - baseLeft - 50) / btnWidth;
+                    maxHoverBonus = Math.min(0.4, Math.max(0, safeScale - 1));
+                }
+                const expandedWidth = btnWidth * (1 + maxHoverBonus) * 1.15;
+
+                const distX = mouseX < baseLeft ? Math.max(0, baseLeft - mouseX) : Math.max(0, mouseX - (baseLeft + expandedWidth));
+                const localFactorX = Math.max(0, 1 - (distX / horizontalFalloff));
+                globalHoverFactorX = Math.max(globalHoverFactorX, localFactorX);
+
+                if (mouseX >= 0 && distY < maxDist * 1.5 && distX < horizontalFalloff) {
+                    isHoveringContainer = true;
                 }
             });
 
-            const horizontalFalloff = maxDist * 1.5;
-            const globalBaseLeft = buttonStates[0].baseOffsetLeft + containerRect.left;
-            const globalDistX = mouseX < globalBaseLeft ? Math.max(0, globalBaseLeft - mouseX) : Math.max(0, mouseX - (globalBaseLeft + blendedWidth));
-            const globalFactorX = Math.max(0, 1 - (globalDistX / horizontalFalloff));
-
-            state.jiggly.isHoveringContainer = (minDistanceToAnyButton < maxDist * 1.5) && (globalFactorX > 0);
+            state.jiggly.isHoveringContainer = isHoveringContainer;
 
             // Safely update base metrics only when not interacting and animations have settled
             // This prevents the font-weight layout shift from causing an infinite jitter loop
@@ -1666,6 +1657,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     bState.baseOffsetTop = bState.el.offsetTop;
                     bState.baseOffsetLeft = bState.el.offsetLeft;
                     bState.baseOffsetWidth = bState.el.offsetWidth;
+                    bState.trueBtnWidth = bState.el.offsetWidth;
                     bState.baseOffsetHeight = bState.el.offsetHeight;
                 });
                 maxFirstFourWidth = Math.max(...buttonStates.slice(0, 4).map(b => b.baseOffsetWidth));
@@ -1675,18 +1667,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Base calculations off of cached offsets rather than dynamic ones
                 const baseTop = bState.baseOffsetTop + containerRect.top;
                 const baseLeft = bState.baseOffsetLeft + containerRect.left;
-                const btnWidth = bState.baseOffsetWidth;
+                const btnWidth = bState.trueBtnWidth || bState.baseOffsetWidth;
                 const btnHeight = bState.baseOffsetHeight;
-                const isDefaultLastFm = i === 4 && (bState.el.getAttribute('data-text') || '').trim().toLowerCase() === 'last.fm';
-                const effectiveBtnWidth = (i < 4 || isDefaultLastFm) ? maxFirstFourWidth : btnWidth;
 
                 let maxHoverBonus = 0.4;
                 let maxTouchBonus = 0.1;
-                if (effectiveBtnWidth > 0) {
-                    let safeScale = window.innerWidth <= 768 ? (window.innerWidth - 50) / effectiveBtnWidth : (window.innerWidth - baseLeft - 50) / effectiveBtnWidth;
+                if (btnWidth > 0) {
+                    let safeScale = window.innerWidth <= 768 ? (window.innerWidth - 50) / btnWidth : (window.innerWidth - baseLeft - 50) / btnWidth;
                     maxHoverBonus = Math.min(0.4, Math.max(0, safeScale - 1));
                     maxTouchBonus = Math.min(0.1, Math.max(0, safeScale - 1));
                 }
+                const expandedWidth = btnWidth * (1 + maxHoverBonus) * 1.15;
 
                 // Dynamically enforce the 50px word wrap boundary based on the current scale
                 // This ensures text only wraps when it actually grows, leaving it unwrapped at rest
@@ -1746,14 +1737,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     let curve = 0;
                     let textCurve = 0;
                     const factorY = Math.max(0, 1 - (distY / maxDist));
-                    const factorX = globalFactorX;
-                    const factor = factorX * factorY;
+                    const distX = mouseX < baseLeft ? Math.max(0, baseLeft - mouseX) : Math.max(0, mouseX - (baseLeft + expandedWidth));
+                    const localFactorX = Math.max(0, 1 - (distX / horizontalFalloff));
+                    const factor = localFactorX * factorY;
 
                     if (factor > 0 && mouseX >= 0) {
                         // Smooth exponential falloff horizontally, smooth sine curve vertically
-                        curve = Math.pow(factorX, 2) * Math.sin(factorY * Math.PI / 2) * Math.pow(containerFactorY, 6);
+                        curve = Math.pow(localFactorX, 2) * Math.sin(factorY * Math.PI / 2) * Math.pow(containerFactorY, 6);
                         // Twice as exponential for bold and width
-                        textCurve = Math.pow(factorX, 4) * Math.sin(factorY * Math.PI / 2) * Math.pow(containerFactorY, 6);
+                        textCurve = Math.pow(localFactorX, 4) * Math.sin(factorY * Math.PI / 2) * Math.pow(containerFactorY, 6);
                     }
 
                     bState.targetScale = 1 + (maxHoverBonus * curve);
@@ -1763,14 +1755,44 @@ document.addEventListener('DOMContentLoaded', () => {
                     bState.targetWeight = 300 + (400 * textCurve);
                     bState.targetWidthAxis = 100 + (12.5 * textCurve);
 
+                    let pullX = 0;
+                    let pullY = 0;
+                    if (factor > 0 && mouseX >= 0) {
+                        // Double the magnetic pull (12%) for the button currently being hovered over, default to 6% for others
+                        const isDirectlyHovered = distX === 0 && distY < (Math.max(btnHeight, bState.targetHeight) * 0.6);
+                        const pullMultiplier = isDirectlyHovered ? 0.12 : 0.06;
+
+                        // Position magnet based on the exact resting center of the text rather than the expanded hit box
+                        pullX = (mouseX - (baseLeft + btnWidth / 2)) * pullMultiplier * curve;
+                        pullY = (mouseY - btnCenterY) * pullMultiplier * curve;
+
+                        // Subtly dampen negative (leftward) pull to prevent the menu from awkwardly shifting left out of margin alignment
+                        if (pullX < 0) {
+                            pullX *= 0.4;
+                        }
+                    }
+
                     let pushY = 0;
-                    if (factor > 0 && mouseX >= 0 && Math.abs(signedDistY) < maxDist * 1.5) {
+                    if (globalHoverFactorX > 0 && mouseX >= 0 && Math.abs(signedDistY) < maxDist * 1.5) {
                         const normalizedDist = signedDistY / (maxDist * 1.5);
                         // Smooth curve vertically, gentle drop-off horizontally
                         const pushCurve = normalizedDist * Math.pow(1 - Math.abs(normalizedDist), 2);
-                        pushY = pushCurve * basePush * 4 * Math.pow(factorX, 2) * Math.pow(containerFactorY, 6);
+
+                        let pushMultiplier = 4;
+                        const isLastFm = bState.el.id === 'lastfm-button';
+                        const isAboveLastFm = i + 1 < buttonStates.length && buttonStates[i + 1].el.id === 'lastfm-button';
+
+                        // Add extra repulsion between Last.fm and the button above it (Spotify) to prevent overlap on hover
+                        if (isAboveLastFm && signedDistY < 0) {
+                            pushMultiplier = 7.5;
+                        } else if (isLastFm && signedDistY > 0) {
+                            pushMultiplier = 7.5;
+                        }
+
+                        pushY = pushCurve * basePush * pushMultiplier * Math.pow(globalHoverFactorX, 2) * Math.pow(containerFactorY, 6);
                     }
-                    bState.targetY = pushY;
+                    bState.targetX = pullX;
+                    bState.targetY = pushY + pullY;
                 }
             });
 
@@ -1800,14 +1822,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     bState.needsMeasurement = false;
                 }
                 if (bState.needsWordMeasurement) {
+                    let maxRight = 0;
                     bState.wordStates.forEach(wState => {
                         wState.targetX = wState.el.offsetLeft;
                         wState.targetY = wState.el.offsetTop;
+                        const rightEdge = wState.targetX + wState.el.offsetWidth;
+                        if (rightEdge > maxRight) maxRight = rightEdge;
                         if (wState.currentX === null) {
                             wState.currentX = wState.targetX;
                             wState.currentY = wState.targetY;
                         }
                     });
+                    if (maxRight > 0) bState.trueBtnWidth = maxRight;
                     bState.needsWordMeasurement = false;
                 }
             });
