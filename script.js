@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lastfmPollIntervalId: null, currentAlbumArtUrl: '', initialSceneSetupPerformed: false,
         firstLastFmColorChangeDone: false, lastFmColorsExtractedSuccessfully: false,
         firstLastFmFetchAttempted: false, lastFmArtProcessing: false,
-        DEFAULT_IMAGE_URL: './assets/bgimg/achtsquare_512.png',
+        DEFAULT_IMAGE_URL: './assets/bgimg/neinsquare_512.png',
         previousFrameAnimatedBgColor: '#121212', defaultBackgroundColor: '#121212', defaultColorsLoaded: false,
         isInitialShapeSpawn: true, previousColorPaletteForCleanup: [], paletteChangeTimestampForCleanup: 0,
         cleanupTriggeredForCurrentPaletteChange: true,
